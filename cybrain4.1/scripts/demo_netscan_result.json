@@ -1,0 +1,32 @@
+{
+  "target": "127.0.0.1",
+  "scan_type": "external",
+  "vulnerabilities": [
+    {
+      "title": "منفذ مفتوح: 5000/tcp (http)",
+      "severity": "info",
+      "port": 5000,
+      "protocol": "tcp",
+      "service": "http",
+      "version": "Flask Development Server",
+      "description": "المنفذ 5000/tcp مفتوح يُشغّل http",
+      "host": "127.0.0.1"
+    },
+    {
+      "title": "منفذ مفتوح: 22/tcp (ssh)",
+      "severity": "medium",
+      "port": 22,
+      "protocol": "tcp",
+      "service": "ssh",
+      "version": "OpenSSH 7.4",
+      "description": "المنفذ 22/tcp مفتوح يُشغّل ssh",
+      "host": "127.0.0.1"
+    }
+  ],
+  "meta": {
+    "scan_time": "2026-05-20T18:45:30.123456+00:00",
+    "deep": false,
+    "hosts_up": "1",
+    "total_hosts": "1"
+  }
+}

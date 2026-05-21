@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyBrain — لوحة التحكم</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: #0a0e1a;
+            color: #c8d8e8;
+            direction: rtl;
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ── Top Nav ── */
+        .nav {
+            background: #020408;
+            border-bottom: 2px solid #00f5ff22;
+            padding: 14px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-brand { color: #00f5ff; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-decoration: none; }
+        .nav-links a {
+            color: #7fa8c8; text-decoration: none; margin-right: 20px; font-size: 0.88rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: #00f5ff; }
+        .nav-user { color: #4a6a8a; font-size: 0.82rem; }
+
+        /* ── Page Wrapper ── */
+        .page { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
+
+        /* ── Hero Stats ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            padding: 20px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--accent, #00f5ff);
+        }
+        .stat-card .value { font-size: 2rem; font-weight: 700; color: var(--accent, #00f5ff); }
+        .stat-card .label { font-size: 0.82rem; color: #5a7a9a; margin-top: 4px; }
+        .stat-card.critical { --accent: #ff4444; }
+        .stat-card.high     { --accent: #ff8c00; }
+        .stat-card.medium   { --accent: #f5c518; }
+        .stat-card.ok       { --accent: #00c853; }
+
+        /* ── Risk Trend ── */
+        .section-title {
+            font-size: 1rem;
+            color: #00f5ff;
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e3a5a;
+        }
+
+        /* ── History Table ── */
+        .table-wrap {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 28px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            background: #0a1520;
+            color: #4a8ab0;
+            font-size: 0.78rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 12px 16px;
+            text-align: right;
+        }
+        td { padding: 11px 16px; border-bottom: 1px solid #1a2e44; font-size: 0.87rem; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #0d1e30; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-critical { background: #ff444422; color: #ff6666; border: 1px solid #ff444444; }
+        .badge-high     { background: #ff8c0022; color: #ffaa44; border: 1px solid #ff8c0044; }
+        .badge-medium   { background: #f5c51822; color: #f5c518; border: 1px solid #f5c51844; }
+        .badge-low      { background: #4caf5022; color: #66bb6a; border: 1px solid #4caf5044; }
+        .badge-info     { background: #00bcd422; color: #26c6da; border: 1px solid #00bcd444; }
+
+        .scan-type-label {
+            font-size: 0.75rem;
+            color: #4a8ab0;
+            background: #0a1520;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #1e3a5a;
+        }
+
+        .risk-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .risk-bar .bar {
+            flex: 1;
+            height: 6px;
+            background: #1a2e44;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .risk-bar .fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--bar-color, #00f5ff);
+        }
+        .risk-bar .score { font-size: 0.8rem; font-weight: 700; min-width: 36px; text-align: left; }
+
+        /* Risk levels — colour applied via class, not inline CSS vars */
+        .risk-critical .fill  { background: #ff4444; }
+        .risk-critical .score { color: #ff4444; }
+        .risk-high     .fill  { background: #ff8c00; }
+        .risk-high     .score { color: #ff8c00; }
+        .risk-medium   .fill  { background: #f5c518; }
+        .risk-medium   .score { color: #f5c518; }
+        .risk-low      .fill  { background: #00c853; }
+        .risk-low      .score { color: #00c853; }
+
+        /* Table cell helpers */
+        .td-date   { color: #4a8ab0; font-size: 0.8rem; }
+        .td-target { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .td-empty  { color: #3a5a7a; }
+
+        .btn-view {
+            display: inline-block;
+            padding: 4px 14px;
+            background: #00f5ff11;
+            border: 1px solid #00f5ff44;
+            color: #00f5ff;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn-view:hover { background: #00f5ff22; }
+
+        /* ── Empty State ── */
+        .empty {
+            text-align: center;
+            padding: 48px 24px;
+            color: #3a5a7a;
+        }
+        .empty .icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+        .empty p { margin-bottom: 16px; }
+        .btn-new-scan {
+            display: inline-block;
+            padding: 10px 28px;
+            background: linear-gradient(90deg, #00f5ff, #0070ff);
+            color: #000;
+            border-radius: 8px;
+            font-weight: 700;
+            text-decoration: none;
+            font-size: 0.88rem;
+        }
+
+        /* ── By Type Breakdown ── */
+        .type-pills { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+        .type-pill {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 8px;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .type-pill .count { font-size: 1.3rem; font-weight: 700; color: #00f5ff; }
+        .type-pill .name  { font-size: 0.8rem; color: #5a7a9a; }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav">
+    <a class="nav-brand" href="/">⬡ CyBrain</a>
+    <div class="nav-links">
+        <a href="/">فحص جديد</a>
+        <a href="/dashboard">لوحة التحكم</a>
+        {% if current_user.is_admin %}
+        <a href="/admin/users">إدارة المستخدمين</a>
+        <a href="/admin/audit">سجل التدقيق</a>
+        {% endif %}
+        <a href="/logout">خروج</a>
+    </div>
+    <span class="nav-user">
+        {{ user }}
+        {% if current_user.is_admin %}<span style="color:#00f5ff;font-size:0.75rem;margin-right:6px;">[مشرف]</span>{% endif %}
+    </span>
+</nav>
+
+<div class="page">
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div style="background:{% if category=='error' %}#ff444422{% else %}#00c85322{% endif %};border:1px solid {% if category=='error' %}#ff444466{% else %}#00c85366{% endif %};color:{% if category=='error' %}#ff6666{% else %}#66bb6a{% endif %};padding:12px 18px;border-radius:8px;margin-bottom:16px;font-size:0.9rem;">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- ── Hero Stats ── -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="value">{{ stats.total_scans }}</div>
+            <div class="label">إجمالي الفحوصات</div>
+        </div>
+        <div class="stat-card">
+            <div class="value">{{ stats.total_vulns }}</div>
+            <div class="label">إجمالي الثغرات</div>
+        </div>
+        <div class="stat-card critical">
+            <div class="value">{{ stats.critical_count }}</div>
+            <div class="label">ثغرات حرجة</div>
+        </div>
+        <div class="stat-card high">
+            <div class="value">{{ stats.high_count }}</div>
+            <div class="label">ثغرات عالية</div>
+        </div>
+        {% if stats.avg_risk_score is not none %}
+        <div class="stat-card ok">
+            <div class="value">{{ "%.0f"|format(stats.avg_risk_score) }}</div>
+            <div class="label">متوسط Risk Score</div>
+        </div>
+        {% endif %}
+        {% if current_user.is_admin and stats.active_users is defined %}
+        <div class="stat-card" style="--accent:#7c6af5;">
+            <div class="value">{{ stats.active_users }}</div>
+            <div class="label">مستخدمون نشطون</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── Scan Type Breakdown ── -->
+    {% if stats.by_type %}
+    <div class="section-title">توزيع الفحوصات حسب النوع</div>
+    <div class="type-pills">
+        {% set TYPE_LABELS = {
+            'network_ext': 'شبكات خارجي',
+            'network_int': 'شبكات داخلي',
+            'web':         'ويب',
+            'server_ext':  'سيرفر خارجي',
+            'server_int':  'سيرفر داخلي',
+            'dependencies':'التبعيات',
+            'sast':        'SAST',
+            'dast':        'DAST',
+        } %}
+        {% for row in stats.by_type %}
+        <div class="type-pill">
+            <span class="count">{{ row.count }}</span>
+            <span class="name">{{ TYPE_LABELS.get(row.scan_type, row.scan_type) }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ── Scan History ── -->
+    <div class="section-title">
+        {% if current_user.is_admin %}آخر الفحوصات — جميع المستخدمين{% else %}آخر الفحوصات{% endif %}
+    </div>
+
+    {% if reports %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    {% if current_user.is_admin %}<th>المستخدم</th>{% endif %}
+                    <th>الهدف</th>
+                    <th>النوع</th>
+                    <th>Risk Score</th>
+                    <th>الثغرات</th>
+                    <th>التقرير</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reports %}
+                {% set score = r.risk_score|float %}
+                {% if score >= 75 %}
+                    {% set risk_cls = 'risk-critical' %}
+                {% elif score >= 50 %}
+                    {% set risk_cls = 'risk-high' %}
+                {% elif score >= 25 %}
+                    {% set risk_cls = 'risk-medium' %}
+                {% else %}
+                    {% set risk_cls = 'risk-low' %}
+                {% endif %}
+                <tr>
+                    <td class="td-date">
+                        {{ r.stored_at[:16].replace('T', ' ') if r.stored_at else '—' }}
+                    </td>
+                    {% if current_user.is_admin %}
+                    <td style="color:#7fa8c8;font-size:0.82rem;">{{ r.username or '—' }}</td>
+                    {% endif %}
+                    <td class="td-target">
+                        {{ r.target or '—' }}
+                    </td>
+                    <td>
+                        <span class="scan-type-label">{{ r.scan_type or '—' }}</span>
+                    </td>
+                    <td>
+                        <div class="risk-bar {{ risk_cls }}">
+                            <div class="bar"><div class="fill" data-pct="{{ [score|float, 100]|min|int }}"></div></div>
+                            <span class="score">{{ "%.0f"|format(score) }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if r.critical_count %}
+                        <span class="badge badge-critical">{{ r.critical_count }} C</span>
+                        {% endif %}
+                        {% if r.high_count %}
+                        <span class="badge badge-high">{{ r.high_count }} H</span>
+                        {% endif %}
+                        {% if r.medium_count %}
+                        <span class="badge badge-medium">{{ r.medium_count }} M</span>
+                        {% endif %}
+                        {% if not r.critical_count and not r.high_count and not r.medium_count %}
+                        <span class="badge badge-info">{{ r.vuln_count or 0 }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if r.token %}
+                        <a class="btn-view" href="/report/{{ r.token }}">عرض ↗</a>
+                        {% else %}
+                        <span class="td-empty">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="icon">🛡</div>
+        <p>لا توجد فحوصات سابقة</p>
+        <a class="btn-new-scan" href="/">ابدأ فحصاً جديداً</a>
+    </div>
+    {% endif %}
+
+</div>
+<script>
+    // تعيين عرض شريط الخطورة من data-pct (يتفادى style مباشر)
+    document.querySelectorAll('.fill[data-pct]').forEach(function(el) {
+        el.style.width = el.getAttribute('data-pct') + '%';
+    });
+</script>
+</body>
+</html>

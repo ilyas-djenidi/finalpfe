@@ -1,0 +1,104 @@
+/**
+ * base.css
+ * ─────────────────────────────────────────────
+ * CSS reset + global element defaults.
+ * No component-specific rules here.
+ */
+
+/* ── Reset ── */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ── Root ── */
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%; /* Safari, iOS */
+    -moz-text-size-adjust:    100%; /* Firefox */
+    text-size-adjust:         100%; /* Chrome 54+, Edge 79+, Samsung Internet */
+}
+
+/* ── Body ── */
+body {
+    background:    var(--bg-primary);
+    color:         var(--text-primary);
+    font-family:   var(--font-body);
+    min-height:    100vh;
+    overflow-x:    hidden;
+    position:      relative;
+    line-height:   1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Animated grid background ── */
+body::before {
+    content:  '';
+    position: fixed;
+    inset:    0;
+    background-image:
+        linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: gridMove 20s linear infinite;
+    pointer-events: none;
+    z-index: var(--z-bg);
+}
+
+/* ── Scan line effect ── */
+body::after {
+    content:    '';
+    position:   fixed;
+    top:        -100%;
+    left:       0;
+    right:      0;
+    height:     2px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    animation:  scanLine 4s ease-in-out infinite;
+    pointer-events: none;
+    z-index:    var(--z-scanline);
+    opacity:    0.6;
+}
+
+/* ── Typography ── */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    line-height: 1.2;
+}
+
+/* ── Inputs & Buttons ── */
+input, button, select, textarea {
+    font-family: inherit;
+    font-size:   inherit;
+    border:      none;
+    outline:     none;
+}
+
+button {
+    cursor: pointer;
+}
+
+/* ── Focus visible (accessibility) ── */
+:focus-visible {
+    outline: 2px solid var(--accent-cyan);
+    outline-offset: 2px;
+}
+
+/* ── Fieldset reset ── */
+fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+legend {
+    padding: 0;
+    float: left;   /* makes legend behave in flow */
+    width: 100%;
+}
+
+legend + * {
+    clear: both;
+}

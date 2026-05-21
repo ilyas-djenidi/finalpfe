@@ -1,0 +1,580 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CyBrain â€” Ù…Ù†ØµØ© Ø§Ù„ØªÙ‚ÙŠÙŠÙ… Ø§Ù„Ø£Ù…Ù†ÙŠ Ø§Ù„Ø´Ø§Ù…Ù„Ø©">
+    <meta name="robots" content="noindex, nofollow">
+
+    <title>CyBrain â€” Ù…Ù†ØµØ© Ø§Ù„ØªÙ‚ÙŠÙŠÙ… Ø§Ù„Ø£Ù…Ù†ÙŠ</title>
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Stylesheets â€” ordered by specificity -->
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+
+    <!-- â–‘â–‘ BACKGROUND EFFECTS â–‘â–‘ -->
+    <div class="particles" id="particles" aria-hidden="true"></div>
+
+    <div class="wrapper">
+
+        <!-- â–‘â–‘ HEADER â–‘â–‘ -->
+        <header class="header" role="banner">
+            <div class="logo" aria-label="NEXUS Security Logo">
+                <div class="logo-icon" aria-hidden="true">
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <polygon points="20,2 38,11 38,29 20,38 2,29 2,11" stroke="#00f5ff" stroke-width="1.5" fill="rgba(0,245,255,0.05)"/>
+                        <polygon points="20,8 32,14 32,26 20,32 8,26 8,14" stroke="#00f5ff" stroke-width="0.8" fill="none" opacity="0.5"/>
+                        <circle cx="20" cy="20" r="4" fill="#00f5ff" opacity="0.8"/>
+                        <line x1="20" y1="2" x2="20" y2="8" stroke="#00f5ff" stroke-width="1.5"/>
+                        <line x1="38" y1="11" x2="32" y2="14" stroke="#00f5ff" stroke-width="1.5"/>
+                        <line x1="38" y1="29" x2="32" y2="26" stroke="#00f5ff" stroke-width="1.5"/>
+                        <line x1="20" y1="38" x2="20" y2="32" stroke="#00f5ff" stroke-width="1.5"/>
+                        <line x1="2" y1="29" x2="8" y2="26" stroke="#00f5ff" stroke-width="1.5"/>
+                        <line x1="2" y1="11" x2="8" y2="14" stroke="#00f5ff" stroke-width="1.5"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="logo-text">CYBRAIN</div>
+                    <span class="logo-sub">SECURITY ASSESSMENT PLATFORM</span>
+                </div>
+            </div>
+
+            <div class="header-status" role="status" aria-live="polite">
+                <div class="status-indicator">
+                    <div class="status-dot" aria-hidden="true"></div>
+                    <span>SYSTEM ONLINE</span>
+                </div>
+                <div class="threat-level" id="threatLevel">THREAT LEVEL: LOW</div>
+                <!-- User info & logout -->
+                <div class="status-indicator user-info">
+                    <span class="user-label">
+                        USER: <strong class="user-name">{{ current_user.username | upper }}</strong>
+                        {% if current_user.is_admin %}<span style="color:#ff6644;font-size:0.7rem;margin-right:4px;">[ADMIN]</span>{% endif %}
+                    </span>
+                    {% if current_user.is_admin %}
+                    <a href="/admin"
+                       class="logout-btn"
+                       style="background:rgba(255,100,68,0.15);border-color:rgba(255,100,68,0.4);color:#ff6644;"
+                       aria-label="Ù„ÙˆØ­Ø© ØªØ­ÙƒÙ… Ø§Ù„Ù…Ø´Ø±Ù">ADMIN PANEL</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}"
+                       class="logout-btn"
+                       aria-label="ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬">LOGOUT</a>
+                    <a href="{{ url_for('dashboard') }}"
+                       class="logout-btn logout-btn--dashboard"
+                       aria-label="Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…">DASHBOARD</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- â–‘â–‘ MAIN CONTENT â–‘â–‘ -->
+        <main class="main" role="main">
+            <div class="scan-container">
+
+                <!-- Title Section -->
+                <div class="scan-title-section">
+                    <div class="scan-label" aria-hidden="true">CYBRAIN // SCAN CONSOLE</div>
+                    <h1 class="scan-title">Ø¥Ù†Ø´Ø§Ø¡ <span>ÙØ­Øµ Ø£Ù…Ù†ÙŠ</span> Ø¬Ø¯ÙŠØ¯</h1>
+                    <p class="scan-subtitle">Ø­Ø¯Ù‘Ø¯ Ø§Ù„Ù‡Ø¯Ù ÙˆØ¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„ÙØ­Øµ Ù„Ø¨Ø¯Ø¡ Ø§Ù„ØªÙ‚ÙŠÙŠÙ… Ø§Ù„Ø£Ù…Ù†ÙŠ Ø§Ù„Ø´Ø§Ù…Ù„</p>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    <div class="flash-zone" role="alert" aria-live="assertive">
+                        {% for category, msg in messages %}
+                        <div class="alert-bar flash-item {{ category }}">
+                            <span>{{ 'âœ“' if category == 'success' else ('âš ' if category == 'warning' else 'âœ—') }}</span>
+                            <span>{{ msg }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Form Card -->
+                <div class="form-card" role="region" aria-label="Ù†Ù…ÙˆØ°Ø¬ Ø¥Ù†Ø´Ø§Ø¡ ÙØ­Øµ Ø£Ù…Ù†ÙŠ">
+
+                    <!-- Corner decorations -->
+                    <div class="corner corner-tl" aria-hidden="true"></div>
+                    <div class="corner corner-tr" aria-hidden="true"></div>
+                    <div class="corner corner-bl" aria-hidden="true"></div>
+                    <div class="corner corner-br" aria-hidden="true"></div>
+
+                    <!-- enctype required for config_file upload -->
+                    <form id="scanForm"
+                          method="POST"
+                          action="{{ url_for('start_scan') }}"
+                          enctype="multipart/form-data"
+                          autocomplete="off"
+                          novalidate>
+
+                        <!-- CSRF Token â€” generated server-side by Flask-WTF -->
+                        {{ form.hidden_tag() }}
+
+                        <!-- â‘  Ø§Ù„Ù‡Ø¯Ù -->
+                        <div class="field-group" id="targetGroup">
+                            <label class="field-label" for="target">
+                                <span class="icon" aria-hidden="true">â—ˆ</span>
+                                Ø§Ù„Ù‡Ø¯Ù
+                                <span class="field-required" id="targetRequired" aria-label="Ù…Ø·Ù„ÙˆØ¨">[ Ù…Ø·Ù„ÙˆØ¨ ]</span>
+                            </label>
+                            <div class="target-wrapper">
+                                <span class="target-prefix" aria-hidden="true">TARGET://</span>
+                                <input
+                                    type="text"
+                                    id="target"
+                                    name="target"
+                                    class="scan-input"
+                                    placeholder="example.com Ø£Ùˆ 192.168.1.1"
+                                    required
+                                    autocomplete="off"
+                                    dir="ltr"
+                                    aria-describedby="targetFeedback"
+                                    aria-required="true"
+                                    value="{{ form.target.data or '' }}"
+                                >
+                            </div>
+                            <div class="field-feedback" id="targetFeedback" role="alert" aria-live="polite">
+                                {% if form.target.errors %}
+                                    <span class="field-feedback visible invalid">âœ— {{ form.target.errors[0] }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="csrf-info" aria-label="Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø£Ù…Ø§Ù†">
+                                <span aria-hidden="true" class="csrf-check-icon">âœ“</span>
+                                <span class="csrf-text">CSRF PROTECTED Â· TLS ENCRYPTED Â· AUDIT LOGGED</span>
+                            </div>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="field-divider" aria-hidden="true">
+                            <div class="divider-line"></div>
+                            <div class="divider-text">// SCAN CONFIGURATION //</div>
+                            <div class="divider-line"></div>
+                        </div>
+
+                        <!-- â‘¡ Ù†ÙˆØ¹ Ø§Ù„ÙØ­Øµ -->
+                        <div class="field-group">
+                            <fieldset>
+                                <legend class="field-label">
+                                    <span class="icon" aria-hidden="true">â—ˆ</span>
+                                    Ù†ÙˆØ¹ Ø§Ù„ÙØ­Øµ
+                                </legend>
+                                <div class="scan-type-grid" role="radiogroup" aria-label="Ø§Ø®ØªØ± Ù†ÙˆØ¹ Ø§Ù„ÙØ­Øµ">
+
+                                    <!-- 1. ÙØ­Øµ Ø´Ø¨ÙƒØ§Øª Ø®Ø§Ø±Ø¬ÙŠ -->
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_net_ext" value="network_ext"
+                                               {{ 'checked' if (form.scan_type.data or 'network_ext') == 'network_ext' }}>
+                                        <label class="scan-type-label" for="type_net_ext">
+                                            <span class="type-icon" aria-hidden="true">ðŸŒ</span>
+                                            <span class="type-name">Ø´Ø¨ÙƒØ§Øª Ø®Ø§Ø±Ø¬ÙŠ</span>
+                                            <span class="type-desc">Netscan Â· CVE Â· Ports</span>
+                                        </label>
+                                    </div>
+
+                                    <!-- 2. ÙØ­Øµ Ø´Ø¨ÙƒØ§Øª Ø¯Ø§Ø®Ù„ÙŠ -->
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_net_int" value="network_int"
+                                               {{ 'checked' if form.scan_type.data == 'network_int' }}>
+                                        <label class="scan-type-label" for="type_net_int">
+                                            <span class="type-icon" aria-hidden="true">ðŸ”Œ</span>
+                                            <span class="type-name">Ø´Ø¨ÙƒØ§Øª Ø¯Ø§Ø®Ù„ÙŠ</span>
+                                            <span class="type-desc">LAN Â· Services Â· OS</span>
+                                        </label>
+                                    </div>
+
+                                    <!-- 3. ÙØ­Øµ ÙˆÙŠØ¨ -->
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_web" value="web"
+                                               {{ 'checked' if form.scan_type.data == 'web' }}>
+                                        <label class="scan-type-label" for="type_web">
+                                            <span class="type-icon" aria-hidden="true">âš¡</span>
+                                            <span class="type-name">ÙØ­Øµ ÙˆÙŠØ¨</span>
+                                            <span class="type-desc">Headers Â· SSL Â· CORS</span>
+                                        </label>
+                                    </div>
+
+                                    <!-- 4. ÙØ­Øµ Ø³ÙŠØ±ÙØ± Ø®Ø§Ø±Ø¬ÙŠ -->
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_srv_ext" value="server_ext"
+                                               {{ 'checked' if form.scan_type.data == 'server_ext' }}>
+                                        <label class="scan-type-label" for="type_srv_ext">
+                                            <span class="type-icon" aria-hidden="true">ðŸ–¥ï¸</span>
+                                            <span class="type-name">Ø³ÙŠØ±ÙØ± Ø®Ø§Ø±Ø¬ÙŠ</span>
+                                            <span class="type-desc">Black-Box Â· Banners</span>
+                                        </label>
+                                    </div>
+
+                                    <!-- 5. ÙØ­Øµ Ø³ÙŠØ±ÙØ± Ø¯Ø§Ø®Ù„ÙŠ -->
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_srv_int" value="server_int"
+                                               {{ 'checked' if form.scan_type.data == 'server_int' }}>
+                                        <label class="scan-type-label" for="type_srv_int">
+                                            <span class="type-icon" aria-hidden="true">âš™ï¸</span>
+                                            <span class="type-name">Ø³ÙŠØ±ÙØ± Ø¯Ø§Ø®Ù„ÙŠ</span>
+                                            <span class="type-desc">White-Box Â· httpd.conf</span>
+                                        </label>
+                                    </div>
+
+                                    <!-- 6. ÙØ­Øµ Ø§Ù„ØªØ¨Ø¹ÙŠØ§Øª -->
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_deps" value="dependencies"
+                                               {{ 'checked' if form.scan_type.data == 'dependencies' }}>
+                                        <label class="scan-type-label" for="type_deps">
+                                            <span class="type-icon" aria-hidden="true">ðŸ“¦</span>
+                                            <span class="type-name">Ø§Ù„ØªØ¨Ø¹ÙŠØ§Øª</span>
+                                            <span class="type-desc">CVE Â· pip-audit Â· npm</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_sast" value="sast"
+                                               {{ 'checked' if form.scan_type.data == 'sast' }}>
+                                        <label class="scan-type-label" for="type_sast">
+                                            <span class="type-icon" aria-hidden="true">ðŸ”¬</span>
+                                            <span class="type-name">SAST</span>
+                                            <span class="type-desc">ØªØ­Ù„ÙŠÙ„ Ø§Ù„ÙƒÙˆØ¯ Ø§Ù„Ø«Ø§Ø¨Øª (ZIP)</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="scan-type-option">
+                                        <input type="radio" name="scan_type" id="type_dast" value="dast"
+                                               {{ 'checked' if form.scan_type.data == 'dast' }}>
+                                        <label class="scan-type-label" for="type_dast">
+                                            <span class="type-icon" aria-hidden="true">ðŸŒ</span>
+                                            <span class="type-name">DAST</span>
+                                            <span class="type-desc">ÙØ­Øµ Ø¯ÙŠÙ†Ø§Ù…ÙŠÙƒÙŠ (Nikto)</span>
+                                        </label>
+                                    </div>
+
+                                </div>
+                            </fieldset>
+                        </div>
+
+                        <!-- â‘¢ Ù…Ø³ØªÙˆÙ‰ Ø§Ù„Ø­Ø³Ø§Ø³ÙŠØ© -->
+                        <div class="field-group">
+                            <fieldset>
+                                <legend class="field-label">
+                                    <span class="icon" aria-hidden="true">â—ˆ</span>
+                                    Ù…Ø³ØªÙˆÙ‰ Ø­Ø³Ø§Ø³ÙŠØ© Ø§Ù„Ø¨ÙŠØ¦Ø©
+                                </legend>
+                                <div class="criticality-grid" role="radiogroup" aria-label="Ø§Ø®ØªØ± Ù…Ø³ØªÙˆÙ‰ Ø§Ù„Ø­Ø³Ø§Ø³ÙŠØ©">
+
+                                    <div class="crit-option crit-production">
+                                        <input type="radio" name="criticality" id="crit_prod" value="1"
+                                               {{ 'checked' if (form.criticality.data or '1') == '1' }}>
+                                        <label class="crit-label" for="crit_prod">
+                                            <div class="crit-badge" aria-hidden="true"></div>
+                                            <div class="crit-info">
+                                                <div class="crit-name">Ø¥Ù†ØªØ§Ø¬ Ø­Ø±Ø¬</div>
+                                                <div class="crit-value">WEIGHT: 1.0</div>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <div class="crit-option crit-internal">
+                                        <input type="radio" name="criticality" id="crit_int" value="0.6"
+                                               {{ 'checked' if form.criticality.data == '0.6' }}>
+                                        <label class="crit-label" for="crit_int">
+                                            <div class="crit-badge" aria-hidden="true"></div>
+                                            <div class="crit-info">
+                                                <div class="crit-name">Ù†Ø¸Ø§Ù… Ø¯Ø§Ø®Ù„ÙŠ</div>
+                                                <div class="crit-value">WEIGHT: 0.6</div>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <div class="crit-option crit-testing">
+                                        <input type="radio" name="criticality" id="crit_test" value="0.3"
+                                               {{ 'checked' if form.criticality.data == '0.3' }}>
+                                        <label class="crit-label" for="crit_test">
+                                            <div class="crit-badge" aria-hidden="true"></div>
+                                            <div class="crit-info">
+                                                <div class="crit-name">Ø¨ÙŠØ¦Ø© Ø§Ø®ØªØ¨Ø§Ø±</div>
+                                                <div class="crit-value">WEIGHT: 0.3</div>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                </div>
+                            </fieldset>
+                        </div>
+
+                        <!-- â‘£ Ø®ÙŠØ§Ø±Ø§Øª Ù…ØªÙ‚Ø¯Ù…Ø© -->
+                        <div class="field-group field-group--flush">
+                            <div class="advanced-toggle" id="advancedToggle" role="button" aria-expanded="false" aria-controls="advancedPanel" tabindex="0">
+                                <span class="advanced-toggle-icon" id="advancedArrow" aria-hidden="true">â–¶</span>
+                                <span>Ø®ÙŠØ§Ø±Ø§Øª Ù…ØªÙ‚Ø¯Ù…Ø©</span>
+                            </div>
+                            <div class="advanced-panel" id="advancedPanel" aria-hidden="true">
+                                <div class="advanced-grid">
+
+                                    <label class="toggle-row">
+                                        <span class="toggle-label">ØªÙØµÙŠÙ„ Ø¹Ù…ÙŠÙ‚ (Deep Scan)</span>
+                                        <div class="toggle-switch">
+                                            <input type="checkbox" name="deep_scan" id="deepScan" {{ 'checked' if form.deep_scan.data }}>
+                                            <div class="toggle-track"></div>
+                                            <div class="toggle-thumb"></div>
+                                        </div>
+                                    </label>
+
+                                    <label class="toggle-row">
+                                        <span class="toggle-label">ÙØ­Øµ CVE ØªÙ„Ù‚Ø§Ø¦ÙŠ</span>
+                                        <div class="toggle-switch">
+                                            <input type="checkbox" name="cve_check" id="cveCheck" {{ 'checked' if form.cve_check.data }}>
+                                            <div class="toggle-track"></div>
+                                            <div class="toggle-thumb"></div>
+                                        </div>
+                                    </label>
+
+                                    <label class="toggle-row">
+                                        <span class="toggle-label">Ø§ÙƒØªØ´Ø§Ù SSL/TLS</span>
+                                        <div class="toggle-switch">
+                                            <input type="checkbox" name="ssl_check" id="sslCheck" {{ 'checked' if form.ssl_check.data }}>
+                                            <div class="toggle-track"></div>
+                                            <div class="toggle-thumb"></div>
+                                        </div>
+                                    </label>
+
+                                    <label class="toggle-row">
+                                        <span class="toggle-label">ØªÙ‚Ø±ÙŠØ± PDF ØªÙ„Ù‚Ø§Ø¦ÙŠ</span>
+                                        <div class="toggle-switch">
+                                            <input type="checkbox" name="pdf_report" id="pdfReport" {{ 'checked' if form.pdf_report.data }}>
+                                            <div class="toggle-track"></div>
+                                            <div class="toggle-thumb"></div>
+                                        </div>
+                                    </label>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- â‘¤ Ù…Ù„Ù Ø§Ù„ÙØ­Øµ â€” ÙŠØ¸Ù‡Ø± ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ Ø¹Ù†Ø¯ server_int Ø£Ùˆ dependencies -->
+                        <div class="field-group field-hidden" id="configFileRow">
+                            <label class="field-label" for="config_file">
+                                <span class="icon" aria-hidden="true">â—ˆ</span>
+                                <span id="configFileTitle">Ù…Ù„Ù Ø§Ù„ÙØ­Øµ</span>
+                                <span class="config-file-hint" id="configFileHint"></span>
+                                <span class="field-required" aria-label="Ù…Ø·Ù„ÙˆØ¨">[ Ù…Ø·Ù„ÙˆØ¨ ]</span>
+                            </label>
+                            <input type="file" id="config_file" name="config_file"
+                                   accept=".conf,.txt,.json,.toml"
+                                   class="config-file-input">
+                            <div class="csrf-info">
+                                <span aria-hidden="true" class="csrf-check-icon">â„¹</span>
+                                <span class="csrf-text" id="configFileDesc">Ø§Ø±ÙØ¹ Ø§Ù„Ù…Ù„Ù Ø§Ù„Ù…Ù†Ø§Ø³Ø¨ Ù„Ù†ÙˆØ¹ Ø§Ù„ÙØ­Øµ Ø§Ù„Ù…Ø­Ø¯Ø¯</span>
+                            </div>
+                        </div>
+
+                        <!-- Alert Zone -->
+                        <div class="alert-bar" id="alertBar" role="alert" aria-live="assertive"></div>
+
+                        <!-- Legal Disclaimer â€” ÙŠØ¸Ù‡Ø± Ù„Ù„ÙØ­ÙˆØµØ§Øª Ø§Ù„Ø®Ø§Ø±Ø¬ÙŠØ© ÙÙ‚Ø· -->
+                        <div class="field-group field-hidden" id="legalDisclaimerRow">
+                            <div class="legal-disclaimer">
+                                <input type="checkbox" id="legal_disclaimer" name="legal_disclaimer"
+                                       value="y" class="legal-checkbox">
+                                <label for="legal_disclaimer" class="legal-label">
+                                    <span class="legal-icon" aria-hidden="true">âš </span>
+                                    Ø£ØªØ­Ù…Ù‘Ù„ Ø§Ù„Ù…Ø³Ø¤ÙˆÙ„ÙŠØ© Ø§Ù„Ù‚Ø§Ù†ÙˆÙ†ÙŠØ© ÙˆØ£ÙÙ‚Ø±Ù‘ Ø¨Ø£Ù†Ù†ÙŠ Ù…ÙØ®ÙˆÙŽÙ‘Ù„ Ù„ÙØ­Øµ Ù‡Ø°Ø§ Ø§Ù„Ù‡Ø¯Ù
+                                    <small class="legal-note">(Ù…Ø·Ù„ÙˆØ¨ Ù„Ù„ÙØ­ÙˆØµØ§Øª Ø§Ù„Ø®Ø§Ø±Ø¬ÙŠØ©)</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Submit Section -->
+                        <div class="submit-section">
+                            <button type="submit" class="btn-scan" id="submitBtn" aria-label="Ø¨Ø¯Ø¡ Ø§Ù„ÙØ­Øµ Ø§Ù„Ø£Ù…Ù†ÙŠ">
+                                <span class="normal-text">
+                                    <span>Ø¨Ø¯Ø¡ Ø§Ù„ÙØ­Øµ Ø§Ù„Ø£Ù…Ù†ÙŠ</span>
+                                    <span class="scan-arrow" aria-hidden="true">â†’</span>
+                                </span>
+                                <span class="loading-text" aria-live="polite">
+                                    <span>Ø¬Ø§Ø±Ù Ø§Ù„ØªÙ‡ÙŠØ¦Ø©...</span>
+                                </span>
+                            </button>
+                            <button type="reset" class="btn-secondary" id="resetBtn">Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø·</button>
+                        </div>
+
+                        <!-- Terminal Line -->
+                        <div class="terminal-line" aria-live="polite" aria-label="Ø­Ø§Ù„Ø© Ø§Ù„Ù†Ø¸Ø§Ù…">
+                            <span class="terminal-prompt" aria-hidden="true">cybrain@sec:~$</span>
+                            <span id="terminalText">awaiting_input</span>
+                            <span class="terminal-cursor" aria-hidden="true"></span>
+                        </div>
+
+                    </form>
+
+                    <!-- Stats Bar -->
+                    <div class="stats-bar" role="region" aria-label="Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø§Ù„Ù…Ù†ØµØ©">
+                        <div class="stat-item">
+                            <span class="stat-value" id="statScans" aria-label="Ø¹Ø¯Ø¯ Ø§Ù„ÙØ­ÙˆØµØ§Øª Ø§Ù„Ù…ÙƒØªÙ…Ù„Ø©">0</span>
+                            <span class="stat-label">ÙØ­Øµ Ù…ÙƒØªÙ…Ù„</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="statThreats" aria-label="Ø¹Ø¯Ø¯ Ø§Ù„ØªÙ‡Ø¯ÙŠØ¯Ø§Øª Ø§Ù„Ù…ÙƒØªØ´ÙØ©">0</span>
+                            <span class="stat-label">ØªÙ‡Ø¯ÙŠØ¯ Ù…ÙƒØªØ´Ù</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">99.8%</span>
+                            <span class="stat-label">Ø¯Ù‚Ø© Ø§Ù„ÙØ­Øµ</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">2.4s</span>
+                            <span class="stat-label">Ù…ØªÙˆØ³Ø· Ø§Ù„ÙˆÙ‚Øª</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="scan-progress" id="scanProgress" role="region" aria-label="ØªÙ‚Ø¯Ù… Ø§Ù„ÙØ­Øµ" aria-hidden="true">
+                    <div class="progress-header">
+                        <span class="progress-title">Ø¬Ø§Ø±Ù Ø§Ù„ÙØ­Øµ Ø§Ù„Ø£Ù…Ù†ÙŠ...</span>
+                        <span class="progress-pct" id="progressPct" aria-live="polite">0%</span>
+                    </div>
+                    <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-steps" aria-label="Ù…Ø±Ø§Ø­Ù„ Ø§Ù„ÙØ­Øµ">
+                        <div class="progress-step" id="step1">INIT</div>
+                        <div class="progress-step" id="step2">RECON</div>
+                        <div class="progress-step" id="step3">SCAN</div>
+                        <div class="progress-step" id="step4">ANALYZE</div>
+                        <div class="progress-step" id="step5">REPORT</div>
+                    </div>
+                </div>
+
+                <!-- Scan Results Panel -->
+                <div id="scanResults" class="scan-results" hidden role="region" aria-label="Ù†ØªØ§Ø¦Ø¬ Ø§Ù„ÙØ­Øµ" aria-live="polite"></div>
+
+            </div>
+        </main>
+
+        <!-- â–‘â–‘ FOOTER â–‘â–‘ -->
+        <footer class="footer" role="contentinfo">
+            <span class="footer-text">CYBRAIN SECURITY PLATFORM <span>v1.0.0</span> Â· ENCRYPTED SESSION</span>
+            <span class="footer-text">SYS: <span id="sysTime" aria-live="off"></span> UTC Â· PID: <span>88421</span></span>
+        </footer>
+
+    </div><!-- /.wrapper -->
+
+    <!-- â–‘â–‘ SCRIPTS â€” deferred for performance â–‘â–‘ -->
+    <script src="/static/js/config.js" defer></script>
+    <script src="/static/js/utils.js" defer></script>
+    <script src="/static/js/particles.js" defer></script>
+    <script src="/static/js/validator.js" defer></script>
+    <script src="/static/js/ui.js" defer></script>
+    <script src="/static/js/form.js" defer></script>
+    <script src="/static/js/main.js" defer></script>
+
+    <!-- Dynamic: file-upload row + target field visibility per scan type -->
+    <script defer>
+        window.addEventListener('DOMContentLoaded', () => {
+            const radios      = document.querySelectorAll('input[name="scan_type"]');
+            const row         = document.getElementById('configFileRow');
+            const titleEl     = document.getElementById('configFileTitle');
+            const hintEl      = document.getElementById('configFileHint');
+            const fileInput   = document.getElementById('config_file');
+            const targetInput = document.getElementById('target');
+            const targetGroup = document.getElementById('targetGroup');
+            const legalRow    = document.getElementById('legalDisclaimerRow');
+            const legalCb     = document.getElementById('legal_disclaimer');
+
+            // Ø£Ù†ÙˆØ§Ø¹ Ø§Ù„ÙØ­Øµ Ø§Ù„ØªÙŠ ØªØ­ØªØ§Ø¬ Ø±ÙØ¹ Ù…Ù„Ù
+            const UPLOAD_TYPES = {
+                server_int:   { title: 'Ù…Ù„Ù Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø®Ø§Ø¯Ù…',  hint: '(Ø¥Ù„Ø²Ø§Ù…ÙŠ â€” httpd.conf Ø£Ùˆ nginx.conf)', accept: '.conf,.txt', field: 'config_file' },
+                dependencies: { title: 'Ù…Ù„Ù Ø§Ù„ØªØ¨Ø¹ÙŠØ§Øª',         hint: '(Ø¥Ù„Ø²Ø§Ù…ÙŠ â€” requirements.txt Ø£Ùˆ package.json)', accept: '.txt,.json,.toml', field: 'config_file' },
+                sast:         { title: 'ÙƒÙˆØ¯ Ø§Ù„Ù…ØµØ¯Ø± (ZIP)',      hint: '(Ø¥Ù„Ø²Ø§Ù…ÙŠ â€” Ù…Ø¬Ù„Ø¯ Ø§Ù„ÙƒÙˆØ¯ Ù…Ø¶ØºÙˆØ· .zip)', accept: '.zip', field: 'source_file' },
+            };
+
+            // Ø£Ù†ÙˆØ§Ø¹ ØªØ®ÙÙŠ Ø­Ù‚Ù„ Ø§Ù„Ù‡Ø¯Ù
+            const NO_TARGET_TYPES = new Set(['server_int', 'dependencies', 'sast']);
+
+            // Ø£Ù†ÙˆØ§Ø¹ ØªØªØ·Ù„Ø¨ Ø§Ù„Ø¥Ù‚Ø±Ø§Ø± Ø§Ù„Ù‚Ø§Ù†ÙˆÙ†ÙŠ
+            const EXTERNAL_TYPES = new Set(['network_ext', 'web', 'server_ext', 'dast']);
+
+            // Placeholder Ø­Ø³Ø¨ Ù†ÙˆØ¹ Ø§Ù„ÙØ­Øµ
+            const TARGET_HINTS = {
+                network_ext:  'example.com Ø£Ùˆ 192.168.1.1',
+                network_int:  '192.168.1.0/24 Ø£Ùˆ 10.0.0.1',
+                web:          'https://example.com',
+                server_ext:   'example.com Ø£Ùˆ 192.168.1.1',
+                server_int:   '',
+                dependencies: '',
+                sast:         '',
+                dast:         'https://example.com',
+            };
+
+            function update() {
+                const checked = document.querySelector('input[name="scan_type"]:checked');
+                const val     = checked ? checked.value : '';
+                const cfg     = UPLOAD_TYPES[val];
+                const noTarget = NO_TARGET_TYPES.has(val);
+                const needsLegal = EXTERNAL_TYPES.has(val);
+
+                // --- Ø­Ù‚Ù„ Ø§Ù„Ù‡Ø¯Ù ---
+                if (targetGroup) {
+                    if (noTarget) {
+                        targetGroup.classList.add('field-hidden');
+                        if (targetInput) { targetInput.value = 'local'; targetInput.removeAttribute('required'); }
+                    } else {
+                        targetGroup.classList.remove('field-hidden');
+                        if (targetInput) {
+                            if (targetInput.value === 'local') targetInput.value = '';
+                            targetInput.setAttribute('required', '');
+                            if (TARGET_HINTS[val]) targetInput.placeholder = TARGET_HINTS[val];
+                        }
+                    }
+                }
+
+                // --- Ø§Ù„Ø¥Ù‚Ø±Ø§Ø± Ø§Ù„Ù‚Ø§Ù†ÙˆÙ†ÙŠ ---
+                if (legalRow) {
+                    if (needsLegal) {
+                        legalRow.classList.remove('field-hidden');
+                    } else {
+                        legalRow.classList.add('field-hidden');
+                        if (legalCb) legalCb.checked = false;
+                    }
+                }
+
+                // --- Ø­Ù‚Ù„ Ø±ÙØ¹ Ø§Ù„Ù…Ù„Ù ---
+                if (!row) return;
+                if (cfg) {
+                    row.classList.remove('field-hidden');
+                    if (titleEl)   titleEl.textContent = cfg.title;
+                    if (hintEl)    hintEl.textContent  = cfg.hint;
+                    // ØªØ¹ÙŠÙŠÙ† name Ø§Ù„ØµØ­ÙŠØ­ ØªØ¨Ø¹Ø§Ù‹ Ù„Ù†ÙˆØ¹ Ø§Ù„ÙØ­Øµ
+                    if (fileInput) {
+                        fileInput.accept = cfg.accept;
+                        fileInput.name   = cfg.field || 'config_file';
+                    }
+                } else {
+                    row.classList.add('field-hidden');
+                    if (fileInput) { fileInput.value = ''; fileInput.name = 'config_file'; }
+                }
+            }
+
+            radios.forEach(r => r.addEventListener('change', update));
+            update();
+        });
+    </script>
+
+</body>
+</html>
+

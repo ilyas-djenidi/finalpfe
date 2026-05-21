@@ -1,0 +1,78 @@
+/**
+ * variables.css
+ * ─────────────────────────────────────────────
+ * Design tokens — single source of truth.
+ * All values that could change (theme, brand, sizing)
+ * live here. Never hardcode these elsewhere.
+ *
+ * Sections:
+ *   1. Color Palette
+ *   2. Typography
+ *   3. Spacing & Sizing
+ *   4. Effects & Shadows
+ *   5. Transitions
+ *   6. Z-Index Scale
+ */
+
+:root {
+
+    /* ── 1. Color Palette ── */
+    --bg-primary:        #020408;
+    --bg-secondary:      #060d14;
+    --bg-card:           #0a1520;
+
+    --accent-cyan:       #00f5ff;
+    --accent-green:      #00ff88;
+    --accent-red:        #ff2d55;
+    --accent-orange:     #ff9500;
+
+    --text-primary:      #e8f4f8;
+    --text-muted:        #4a7a8a;
+
+    --border:            rgba(0, 245, 255, 0.15);
+    --border-hover:      rgba(0, 245, 255, 0.50);
+
+    /* ── 2. Typography ── */
+    --font-mono:         'Share Tech Mono', monospace;
+    --font-display:      'Rajdhani', sans-serif;
+    --font-body:         'Cairo', sans-serif;
+
+    --fs-xs:   0.60rem;
+    --fs-sm:   0.70rem;
+    --fs-base: 0.85rem;
+    --fs-md:   0.95rem;
+    --fs-lg:   1.00rem;
+    --fs-xl:   1.20rem;
+    --fs-2xl:  1.40rem;
+    --fs-3xl:  2.80rem;
+
+    /* ── 3. Spacing & Sizing ── */
+    --sp-xs:  4px;
+    --sp-sm:  8px;
+    --sp-md:  12px;
+    --sp-lg:  16px;
+    --sp-xl:  20px;
+    --sp-2xl: 28px;
+    --sp-3xl: 36px;
+    --sp-4xl: 40px;
+
+    --radius-none: 0px;   /* intentional — cyberpunk uses sharp corners */
+
+    /* ── 4. Effects & Shadows ── */
+    --glow-cyan:   0 0 20px rgba(0, 245, 255, 0.30);
+    --glow-green:  0 0 20px rgba(0, 255, 136, 0.30);
+    --glow-red:    0 0 15px rgba(255, 45,  85,  0.20);
+    --glow-orange: 0 0 15px rgba(255, 149, 0,   0.20);
+
+    /* ── 5. Transitions ── */
+    --transition-fast:   all 0.2s ease;
+    --transition-base:   all 0.3s ease;
+    --transition-slow:   all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ── 6. Z-Index Scale ── */
+    --z-bg:       0;
+    --z-base:     1;
+    --z-overlay:  10;
+    --z-modal:    100;
+    --z-scanline: 9999;
+}

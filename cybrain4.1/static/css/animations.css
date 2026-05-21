@@ -1,0 +1,104 @@
+/**
+ * animations.css
+ * ─────────────────────────────────────────────
+ * All @keyframes and animation utility classes.
+ * Centralised here so you can audit/toggle
+ * motion in one place (e.g. prefers-reduced-motion).
+ *
+ * Naming convention: camelCase for @keyframes,
+ * kebab-case for utility classes.
+ */
+
+/* ══════════════════════════════════════════
+   @keyframes
+══════════════════════════════════════════ */
+
+/* Grid background drift */
+@keyframes gridMove {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(50px); }
+}
+
+/* Full-page scan line */
+@keyframes scanLine {
+    0%   { top: -2px;  opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.6; }
+    100% { top: 100%; opacity: 0; }
+}
+
+/* Particle float */
+@keyframes float {
+    0%   { transform: translateY(100vh) translateX(0);   opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.6; }
+    100% { transform: translateY(-10vh) translateX(30px); opacity: 0; }
+}
+
+/* Status dot pulse */
+@keyframes pulse {
+    0%, 100% { opacity: 1;   transform: scale(1);   }
+    50%       { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* Threat level border glow */
+@keyframes borderPulse {
+    0%, 100% { box-shadow: 0 0 5px  rgba(0, 255, 136, 0.20); }
+    50%       { box-shadow: 0 0 15px rgba(0, 255, 136, 0.50); }
+}
+
+/* Header entrance */
+@keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Main content entrance */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Alert slide in */
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Terminal cursor blink */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+}
+
+/* Button loading pulse */
+@keyframes loadingPulse {
+    0%, 100% { opacity: 0.70; }
+    50%       { opacity: 1.00; }
+}
+
+
+/* ══════════════════════════════════════════
+   Reduced Motion — accessibility override
+   Respects prefers-reduced-motion media query
+   by stripping all animations/transitions.
+══════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration:   0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration:  0.01ms !important;
+        scroll-behavior:      auto !important;
+    }
+
+    body::before { animation: none; }
+    body::after  { animation: none; display: none; }
+
+    .particles  { display: none; }
+    .status-dot { animation: none; }
+    .threat-level { animation: none; }
+    .terminal-cursor { animation: none; opacity: 1; }
+}

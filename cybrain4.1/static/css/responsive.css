@@ -1,0 +1,102 @@
+/**
+ * responsive.css
+ * ─────────────────────────────────────────────
+ * Breakpoint overrides only.
+ * Order: largest → smallest (desktop-first).
+ *
+ * Breakpoints:
+ *   lg: 1024px
+ *   md:  768px
+ *   sm:  640px
+ *   xs:  480px
+ */
+
+/* ── Large (≤1024px) ── */
+@media (max-width: 1024px) {
+    .header {
+        padding: 16px 24px;
+    }
+
+    .main {
+        padding: 32px 16px;
+    }
+}
+
+/* ── Medium (≤768px) ── */
+@media (max-width: 768px) {
+    .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stat-item:nth-child(2) {
+        border-right: none;
+    }
+
+    .stat-item:nth-child(3) {
+        border-top: 1px solid var(--border);
+    }
+
+    .stat-item:nth-child(4) {
+        border-top: 1px solid var(--border);
+    }
+}
+
+/* ── Small (≤640px) ── */
+@media (max-width: 640px) {
+    /* Header */
+    .header {
+        padding: var(--sp-lg) var(--sp-xl);
+        flex-wrap: wrap;
+        gap: var(--sp-md);
+    }
+
+    .logo-text     { font-size: 1.1rem; }
+    .logo-sub      { display: none; }
+
+    .header-status { gap: var(--sp-md); }
+    .threat-level  { font-size: 0.60rem; padding: 3px 8px; }
+
+    /* Title */
+    .scan-title    { font-size: 2rem; }
+    .scan-label    { font-size: var(--fs-xs); }
+
+    /* Form Card */
+    .form-card     { padding: 24px var(--sp-xl); }
+
+    /* Grids */
+    .scan-type-grid     { grid-template-columns: repeat(2, 1fr); }
+    .criticality-grid   { grid-template-columns: 1fr; }
+    .advanced-grid      { grid-template-columns: 1fr; }
+    .progress-steps     { grid-template-columns: repeat(5, 1fr); } /* keep 5-col */
+
+    /* Submit */
+    .submit-section {
+        flex-direction: column;
+    }
+
+    .btn-scan      { width: 100%; }
+    .btn-secondary { width: 100%; text-align: center; }
+
+    /* Stats */
+    .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Footer */
+    .footer {
+        flex-direction: column;
+        gap: var(--sp-sm);
+        text-align: center;
+        padding: var(--sp-md) var(--sp-xl);
+    }
+}
+
+/* ── Extra Small (≤480px) ── */
+@media (max-width: 480px) {
+    .scan-type-grid { grid-template-columns: repeat(1, 1fr); }
+
+    .scan-title { font-size: 1.6rem; }
+
+    .field-divider { gap: var(--sp-sm); }
+    .divider-text  { font-size: 0.55rem; letter-spacing: 1px; }
+}

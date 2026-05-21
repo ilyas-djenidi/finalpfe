@@ -1,0 +1,486 @@
+DOCUMENTATION COMPLETE DU PROJET CYBRAIN (v1.2)
+Date: 2026-03-13
+Langue: Francais
+
+====================================================================
+1) OBJECTIF DU PROJET
+====================================================================
+CyBrain est une plateforme web de security assessment qui centralise:
+- la soumission de scans de securite
+- l'analyse de plusieurs surfaces (reseau, web, serveur, dependances, SAST, DAST)
+- le scoring de risque
+- la conservation des rapports
+- la gestion des utilisateurs et de l'audit
+
+Le projet combine:
+- un backend Flask (routes, logique metier, auth, persistance)
+- des scanners Python (Nmap, checks web, checks config, Bandit, Nikto, etc.)
+- une base SQLite (rapports + audit + users)
+- une interface HTML/CSS/JS
+
+
+====================================================================
+2) ARCHITECTURE GLOBALE
+====================================================================
+Noyau backend:
+- app.py: point d'entree Flask, routes et orchestration des scans
+- database.py: couche persistence SQLite
+- models.py: modele User et authentification
+- forms.py: validation Flask-WTF
+- risk_engine.py: calcul du score de risque
+
+Scanners:
+- scanners/nmap_scanner.py: scan reseau via Nmap
+- scanners/web_scanner.py: audit passif web (headers, TLS, CORS...)
+- scanners/server_ext.py: audit serveur externe black-box
+- scanners/server_int.py: audit de fichier de config (white-box)
+- scanners/dep_scanner.py: scan dependances (pip/npm + DB locale)
+- scanners/sast_scanner.py: scan statique ZIP via Bandit
+- scanners/dast_scanner.py: scan dynamique via Nikto
+
+Presentation:
+- templates/: pages HTML (login, scan, dashboard, admin, rapport)
+- css/: theme, layout, composants, animations, responsive
+- js/: logique client, validation, UI, progression, particules
+
+Ops/Deploiement:
+- requirements.txt: dependances Python
+- Dockerfile: image de production
+- docker-compose.yml: app + redis
+- gunicorn.conf.py: configuration WSGI
+
+
+====================================================================
+3) FLUX DE FONCTIONNEMENT (METHODOLOGIE)
+====================================================================
+Flux principal:
+1. L'utilisateur s'authentifie via /login.
+2. Il ouvre / (console de scan) et soumet le formulaire /start-scan.
+3. app.py valide les donnees (forms.py), puis choisit le scanner selon scan_type.
+4. Le scanner retourne un dict standardise contenant vulnerabilities + meta.
+5. risk_engine.calculate_risk() calcule un score 0..10.
+6. database.store_report() stocke resultat + score + compteurs + details.
+7. L'utilisateur consulte /report/<token> et /dashboard.
+8. Toutes les actions sensibles sont tracees dans audit_log.
+
+Principes de securite appliques:
+- CSRF active via Flask-WTF
+- protection login/session via Flask-Login
+- rate limiting via Flask-Limiter
+- controle d'acces par permission (decorateur require_permission)
+- checks anti-IDOR sur les routes de rapport
+
+
+====================================================================
+4) PAGES ET UTILITE DE CHAQUE TEMPLATE
+====================================================================
+- templates/login.html
+  Page d'authentification. Affiche erreurs, formulaire username/password.
+
+- templates/index.html
+  Console principale de scan. Permet de choisir type de scan, options,
+  upload de fichiers pour server_int/dependencies/sast, et lancement scan.
+
+- templates/dashboard.html
+  Vue des statistiques utilisateur (ou globales pour admin), historique,
+  severites, score moyen de risque.
+
+- templates/report.html
+  Rapport detaille d'un scan: score, severites, evidences, recommandations.
+
+- templates/admin_hub.html
+  Hub central admin: indicateurs globaux, liens rapides, synthese securite.
+
+- templates/users.html
+  Gestion des comptes: creation, activation/desactivation, role,
+  reset password, permissions.
+
+- templates/admin_scans.html
+  Supervision des scans globaux (filtres utilisateur/type, suppression).
+
+- templates/audit_log.html
+  Journal d'audit (auth, actions admin, scans, statut, metadata).
+
+- templates/change_password.html
+  Changement de mot de passe utilisateur connecte.
+
+
+====================================================================
+5) ROUTES ET FONCTIONS DE app.py
+====================================================================
+Fonctions infra:
+- _limiter_storage_uri(): choisit redis:// si dispo, sinon memory://
+- css_files(filename): sert fichiers CSS
+- js_files(filename): sert fichiers JS
+- load_user(user_id): charge user Flask-Login
+- require_permission(permission): decorateur de controle d'acces
+
+Handlers erreurs:
+- bad_request(e), forbidden(e), not_found(e), file_too_large(e),
+  rate_limit_exceeded(e), handle_unexpected(e)
+
+Auth:
+- login(): authentification + lockout + audit
+- logout(): deconnexion + audit
+
+Pages principales:
+- home(): page de scan
+- dashboard(): tableau de bord
+- view_report(token): affichage rapport avec check ownership
+- download_fixed(token): telecharge config corrigee (server_int)
+
+Lancement scan:
+- start_scan(): route pivot qui orchestre tous les scanners
+  Types supportes:
+  - network_ext
+  - network_int
+  - web
+  - server_ext
+  - server_int
+  - dependencies
+  - sast
+  - dast
+
+Admin utilisateurs:
+- admin_users()
+- admin_create_user()
+- admin_toggle_user(target_id)
+- admin_reset_password(target_id)
+- admin_update_role(target_id)
+- admin_delete_user(target_id)
+- admin_update_permissions(target_id)
+
+Admin audit/systeme:
+- admin_audit()
+- admin_audit_json()
+- admin_hub()
+- admin_vulnerabilities()
+- admin_scans()
+- admin_delete_scan(token)
+
+Compte:
+- change_password()
+
+
+====================================================================
+6) COUCHE DB: FONCTIONS DE database.py
+====================================================================
+Connexion et schema:
+- get_db()
+- init_db()
+- _seed_default_users()
+
+Users:
+- get_user_by_username(username)
+- get_user_by_id(user_id)
+- get_all_users()
+- create_user(...)
+- update_user(...)
+- delete_user(user_id)
+- update_last_login(user_id)
+- hard_delete_user(user_id)
+- update_user_permissions(user_id, permissions)
+
+Audit:
+- log_event(...)
+- get_audit_log(...)
+- get_audit_stats()
+
+Rapports/scans:
+- store_report(...)
+- get_report(token)
+- get_user_reports(user_id, limit)
+- get_all_reports(limit)
+- delete_report(token)
+- get_top_vulnerabilities(limit)
+
+Stats:
+- get_dashboard_stats(user_id)
+- get_all_dashboard_stats()
+- get_system_stats()
+
+Tables SQLite utilisees:
+- users
+- scan_reports
+- scan_vulnerabilities
+- audit_log
+
+
+====================================================================
+7) MODELES ET VALIDATION
+====================================================================
+models.py:
+- class User(UserMixin)
+  - check_password()
+  - has_permission()
+  - is_admin
+  - from_db_row()
+- load_user_from_db(user_id)
+- authenticate_user(username, password)
+  Inclut logique de lock temporaire apres echecs.
+
+forms.py:
+- class LoginForm
+- validate_target_value(form, field)
+- class ScanForm
+  Champs: target, scan_type, criticality, deep_scan, cve_check,
+  ssl_check, pdf_report, config_file, source_file, legal_disclaimer.
+
+risk_engine.py:
+- calculate_risk(scan_result, criticality=1.0)
+  Mappage severite -> poids, normalisation sur 10.
+
+
+====================================================================
+8) SCANNERS ET FONCTIONS
+====================================================================
+8.1 nmap_scanner.py
+- run_nmap_scan(target, deep=False, internal=False)
+- _assess_port_severity(port, service)
+But: detection services/ports ouverts et severite contextuelle.
+
+8.2 web_scanner.py
+Fonctions detectees:
+- _build_session() [ancienne definition]
+- _normalise_url() [ancienne definition]
+- _check_server_cve() [ancienne definition]
+- _check_sensitive_paths() [ancienne definition]
+- _check_http_methods() [ancienne definition]
+- _check_ssl() [ancienne definition]
+- run_web_scan(...) [ancienne definition]
+- _build_session(retries=2, timeout=10) [nouvelle definition]
+- _normalise_url() [nouvelle definition]
+- _check_server_cve() [nouvelle definition]
+- run_web_scan(...) [nouvelle definition]
+- _check_ssl() [nouvelle definition]
+But: scan passif web (headers, cookies, CORS, SSL, versions exposees).
+Note importante: le fichier contient actuellement des duplications.
+
+8.3 server_ext.py (black-box)
+- class Severity
+- class Finding
+- class ServerScanResult
+- _build_session()
+- _normalize_target(target)
+- _check_headers(response)
+- _check_tls(hostname)
+- _check_sensitive_paths(base_url, session)
+- _check_http_methods(base_url, session)
+- _check_apache_version(version)
+- run_server_scan(target, deep=False)
+
+8.4 server_int.py (white-box config)
+Types:
+- class Severity
+- class ConfigFinding
+- class ConfigScanResult
+
+Parsing/helpers:
+- _parse_config(content)
+- _get_directive_value(parsed, directive)
+- _get_all_directive_values(parsed, directive)
+- _detect_config_type(content)
+- _scan_nginx_config(config_path, content, result)
+
+Generation fix:
+- generate_fixed_config(original_content, vulnerabilities)
+
+Execution globale:
+- run_server_config_scan(config_path)
+
+Checks Apache/Nginx (principaux):
+- _check_server_tokens
+- _check_server_signature
+- _check_directory_listing
+- _check_follow_symlinks
+- _check_ssl_settings
+- _check_dangerous_modules
+- _check_trace_method
+- _check_timeout_settings
+- _check_access_control
+- _check_expose_php
+- _check_limit_request_line
+- _check_limit_request_fields
+- _check_limit_request_field_size
+- _check_limit_request_body
+- _check_security_headers
+- _check_http_methods
+- _check_allow_override
+- _check_keep_alive
+- _check_logging
+- _check_mod_security
+- _check_file_etag
+- _check_exec_cgi
+- _check_mpm_mode
+- _check_max_request_workers
+- _check_max_connections_per_child
+- _check_keep_alive_requests
+- _check_compression_and_cache
+- _check_functional_log_format
+- _check_sendfile_mmap
+- _check_mod_rewrite_security
+- _check_tls_session_cache
+- _check_mpm_params
+
+8.5 dep_scanner.py
+Types:
+- class DepFinding
+- class DepScanResult
+
+Parsing/versioning:
+- _parse_requirements_txt
+- _parse_package_json
+- _parse_pipfile
+- _parse_version
+- _version_in_range
+
+Engines:
+- _check_local_db
+- _run_pip_audit
+- _run_npm_audit
+- run_dep_scan(file_path)
+
+8.6 sast_scanner.py
+- run_sast_scan(file_path)
+But: extraction ZIP securisee + execution Bandit + transformation resultats.
+
+8.7 dast_scanner.py
+- _normalise_url(target)
+- _parse_severity(description)
+- run_dast_scan(target)
+But: execution Nikto, filtrage faux positifs, mapping severite.
+
+
+====================================================================
+9) FRONTEND JS: ROLES ET FONCTIONS
+====================================================================
+- js/config.js
+  Constantes globales client (timings, API endpoints, limites...)
+
+- js/main.js
+  Orchestration init UI:
+  _initAdvancedToggle, _initStats, _boot
+
+- js/form.js
+  Gestion formulaire scan:
+  _bindElements, progressEls, _injectCSRF, _bindTargetValidation,
+  _startProgress, _finishProgress, _renderResults,
+  _getSelectedScanType, _handleSubmit, _handleReset, init
+
+- js/ui.js
+  Utilitaires UI:
+  startClock, stopClock, showAlert, clearAlert, renderTargetFeedback,
+  updateTerminal, setAdvancedPanel, setSubmitLoading,
+  animateCount, updateProgress, setProgressVisible, resetProgress
+
+- js/validator.js
+  Validation cible:
+  isPrivateIP, isDomain, isIP, validateTarget, isValidTarget
+
+- js/utils.js
+  Helpers:
+  generateCSRFToken, sanitise, truncate, clamp, formatNumber,
+  lerp, randomRange, utcTimeString
+
+- js/particles.js
+  Effet visuel de particules:
+  init(container)
+
+
+====================================================================
+10) CSS: UTILITE DE CHAQUE FICHIER
+====================================================================
+- css/variables.css: tokens design (couleurs, tailles, typographie)
+- css/base.css: reset + styles fondamentaux
+- css/layout.css: structure globale (header/main/footer/grids)
+- css/components.css: composants UI reutilisables
+- css/animations.css: keyframes et animations
+- css/responsive.css: adaptations mobiles/tablettes
+
+
+====================================================================
+11) OUTILS EXTERNES ET DEPENDANCES
+====================================================================
+Python/libs principales:
+- Flask, Flask-Login, Flask-WTF, Flask-Limiter, Flask-Session
+- requests, urllib3
+- bcrypt
+- alembic, pytest
+- gunicorn
+- redis client
+
+Outils de scan externes:
+- Nmap (reseau)
+- Bandit (SAST)
+- Nikto (DAST)
+- pip-audit (dependances Python)
+- npm audit (dependances Node.js)
+
+Infra:
+- Docker + Docker Compose
+- Redis (session/rate-limit backend en prod)
+
+
+====================================================================
+12) EXECUTION ET DEPLOIEMENT
+====================================================================
+Execution locale (dev):
+- preparer .venv
+- installer requirements.txt
+- definir .env (SECRET_KEY minimum)
+- lancer: python app.py
+- URL: http://127.0.0.1:5000/
+
+Execution prod:
+- gunicorn -c gunicorn.conf.py app:app
+ou
+- docker compose up --build
+
+Fichiers pertinents:
+- Dockerfile: image python slim, install deps, expose 5000, lance gunicorn
+- docker-compose.yml: service app + service redis
+- gunicorn.conf.py: workers/threads/logging/timeouts
+
+
+====================================================================
+13) SECURITE APPLIQUEE DANS LE PROJET
+====================================================================
+- CSRF sur formulaires
+- verification des permissions par route
+- protection brute-force (lock account)
+- rate limiting global + routes sensibles
+- validation stricte des uploads (type, taille)
+- suppression des fichiers temporaires
+- audit log de toutes operations critiques
+- verifications ownership sur rapports
+
+
+====================================================================
+14) POINTS FORTS ET POINTS A AMELIORER
+====================================================================
+Forces:
+- couverture fonctionnelle large (plusieurs familles de scans)
+- bonne separation backend/scanners/frontend
+- securite applicative de base bien en place
+- audit et administration integres
+
+Ameliorations possibles:
+- deduplication de certaines fonctions scanners
+- factorisation des enums/constants communes
+- reduction imports internes repetes
+- plus de tests unitaires sur scanners et routes critiques
+- generation PDF reelle (si exigee) et pipeline CI securise
+
+
+====================================================================
+15) RESUME EXECUTIF
+====================================================================
+CyBrain est une plateforme de gouvernance securite orientee operationnel:
+- elle orchestre plusieurs moteurs de scan,
+- normalise leurs resultats,
+- calcule un risque,
+- historise les rapports,
+- et fournit une couche admin/audit.
+
+Le projet est deja exploitable. La prochaine etape naturelle est la
+factorisation du code du scanner web et l'extension de la couverture de tests.

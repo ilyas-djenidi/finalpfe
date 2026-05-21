@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyBrain — سجل التدقيق</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: #0a0e1a;
+            color: #c8d8e8;
+            direction: rtl;
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .nav {
+            background: #020408;
+            border-bottom: 2px solid #00f5ff22;
+            padding: 14px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-brand { color: #00f5ff; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-decoration: none; }
+        .nav-links a { color: #7fa8c8; text-decoration: none; margin-right: 20px; font-size: 0.88rem; transition: color 0.2s; }
+        .nav-links a:hover { color: #00f5ff; }
+        .nav-user { color: #4a6a8a; font-size: 0.82rem; }
+
+        .page { max-width: 1300px; margin: 32px auto; padding: 0 16px; }
+
+        .section-title {
+            font-size: 1rem;
+            color: #00f5ff;
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e3a5a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ── Stats Cards ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            padding: 16px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--accent, #00f5ff);
+        }
+        .stat-card.danger { --accent: #ff4444; }
+        .stat-card.warn   { --accent: #f5c518; }
+        .stat-card.ok     { --accent: #00c853; }
+        .stat-card .value { font-size: 1.8rem; font-weight: 700; color: var(--accent, #00f5ff); }
+        .stat-card .label { font-size: 0.78rem; color: #5a7a9a; margin-top: 4px; }
+
+        /* ── Filters ── */
+        .filter-bar {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-bar label { font-size: 0.8rem; color: #6a8aa8; }
+        .filter-bar select, .filter-bar input {
+            background: #0a1520;
+            border: 1px solid #1e3a5a;
+            color: #c8d8e8;
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            outline: none;
+        }
+        .btn {
+            padding: 7px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #00f5ff22; color: #00f5ff; border: 1px solid #00f5ff44; }
+        .btn-primary:hover { background: #00f5ff33; }
+        .btn-ghost { background: transparent; color: #6a8aa8; border: 1px solid #1e3a5a; }
+        .btn-ghost:hover { color: #c8d8e8; }
+
+        /* ── Table ── */
+        .table-wrap {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            overflow: auto;
+            margin-bottom: 28px;
+        }
+        table { width: 100%; border-collapse: collapse; min-width: 900px; }
+        th {
+            background: #0a1520;
+            color: #4a8ab0;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 11px 14px;
+            text-align: right;
+            white-space: nowrap;
+        }
+        td { padding: 9px 14px; border-bottom: 1px solid #1a2e44; font-size: 0.84rem; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #0d1e30; }
+
+        /* Category & Status Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .cat-auth      { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed33; }
+        .cat-scan      { background: #00f5ff22; color: #00f5ff; border: 1px solid #00f5ff33; }
+        .cat-report    { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f633; }
+        .cat-user_mgmt { background: #f5c51822; color: #f5c518; border: 1px solid #f5c51833; }
+        .cat-security  { background: #ff444422; color: #ff6666; border: 1px solid #ff444433; }
+        .cat-system    { background: #64748b22; color: #94a3b8; border: 1px solid #64748b33; }
+        .cat-general   { background: #64748b22; color: #94a3b8; border: 1px solid #64748b33; }
+
+        .status-success { color: #4caf50; }
+        .status-failure { color: #ff6666; font-weight: 600; }
+
+        .ts { color: #4a6a8a; font-size: 0.78rem; font-family: monospace; }
+        .ip { color: #4a8ab0; font-size: 0.78rem; font-family: monospace; }
+
+        .details-cell {
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #7a9ab8;
+            font-size: 0.8rem;
+        }
+
+        .empty-state { text-align: center; padding: 60px; color: #4a6a8a; }
+
+        /* ── Recent Logins Side Panel ── */
+        .two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; margin-bottom: 28px; }
+        @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+        .side-panel {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .side-panel h4 { color: #00f5ff; font-size: 0.88rem; margin-bottom: 12px; }
+        .login-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 7px 0;
+            border-bottom: 1px solid #1a2e44;
+            font-size: 0.8rem;
+        }
+        .login-item:last-child { border-bottom: none; }
+        .login-user { color: #e2e8f0; font-weight: 600; }
+        .login-meta { color: #4a6a8a; font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+
+<nav class="nav">
+    <a href="/" class="nav-brand">◈ CYBRAIN</a>
+    <div class="nav-links">
+        <a href="/">الفحص</a>
+        <a href="/dashboard">لوحة التحكم</a>
+        <a href="/admin/users">المستخدمون</a>
+        <a href="/admin/audit" style="color:#00f5ff">سجل التدقيق</a>
+        <a href="/logout">خروج</a>
+    </div>
+    <div class="nav-user">المشرف: {{ user }}</div>
+</nav>
+
+<div class="page">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="value">{{ stats.total_events }}</div>
+            <div class="label">إجمالي الأحداث</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="value">{{ stats.failed_events }}</div>
+            <div class="label">عمليات فاشلة</div>
+        </div>
+        {% for cat in stats.by_category[:4] %}
+        <div class="stat-card">
+            <div class="value">{{ cat.cnt }}</div>
+            <div class="label">{{ cat.category }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Two-column: category breakdown + recent logins -->
+    <div class="two-col">
+        <!-- Category Breakdown -->
+        <div class="side-panel">
+            <h4>توزيع الأحداث حسب الفئة</h4>
+            {% for cat in stats.by_category %}
+            <div class="login-item">
+                <span><span class="badge cat-{{ cat.category }}">{{ cat.category }}</span></span>
+                <span style="color:#c8d8e8;font-weight:600">{{ cat.cnt }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Recent Logins -->
+        <div class="side-panel">
+            <h4>آخر محاولات الدخول</h4>
+            {% for login in stats.recent_logins %}
+            <div class="login-item">
+                <div>
+                    <div class="login-user">{{ login.username }}</div>
+                    <div class="login-meta">{{ login.ip_address or '—' }}</div>
+                </div>
+                <div style="text-align:left">
+                    <span class="status-{{ login.status }}">
+                        {{ '✓' if login.status == 'success' else '✗' }}
+                    </span>
+                    <div class="login-meta">{{ login.timestamp[11:19] if login.timestamp else '' }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="GET" action="/admin/audit">
+        <div class="filter-bar">
+            <label>الفئة:</label>
+            <select name="category">
+                <option value="">الكل</option>
+                <option value="auth"      {% if filter_category == 'auth' %}selected{% endif %}>auth</option>
+                <option value="scan"      {% if filter_category == 'scan' %}selected{% endif %}>scan</option>
+                <option value="report"    {% if filter_category == 'report' %}selected{% endif %}>report</option>
+                <option value="user_mgmt" {% if filter_category == 'user_mgmt' %}selected{% endif %}>user_mgmt</option>
+                <option value="security"  {% if filter_category == 'security' %}selected{% endif %}>security</option>
+                <option value="system"    {% if filter_category == 'system' %}selected{% endif %}>system</option>
+            </select>
+            <label>الإجراء:</label>
+            <input type="text" name="action" value="{{ filter_action }}" placeholder="بحث في الإجراءات...">
+            <button type="submit" class="btn btn-primary">فلترة</button>
+            <a href="/admin/audit" class="btn btn-ghost">إعادة ضبط</a>
+            <a href="/admin/audit/json" class="btn btn-ghost" target="_blank">تصدير JSON</a>
+            <span style="color:#4a6a8a;font-size:0.8rem;margin-right:auto">
+                {{ events|length }} حدث
+            </span>
+        </div>
+    </form>
+
+    <!-- Events Table -->
+    <div class="section-title">
+        <span>◈</span> سجل الأحداث
+    </div>
+
+    <div class="table-wrap">
+        {% if events %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>التوقيت</th>
+                    <th>المستخدم</th>
+                    <th>الإجراء</th>
+                    <th>الفئة</th>
+                    <th>المورد</th>
+                    <th>عنوان IP</th>
+                    <th>الحالة</th>
+                    <th>التفاصيل</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in events %}
+                <tr>
+                    <td style="color:#4a6a8a;font-size:0.75rem">{{ e.id }}</td>
+                    <td class="ts">
+                        {{ e.timestamp[:10] }}<br>
+                        <span style="color:#6a8aa8">{{ e.timestamp[11:19] }}</span>
+                    </td>
+                    <td style="font-weight:600;color:#e2e8f0">{{ e.username }}</td>
+                    <td style="font-family:monospace;font-size:0.82rem;color:#c8d8e8">{{ e.action }}</td>
+                    <td>
+                        <span class="badge cat-{{ e.category }}">{{ e.category }}</span>
+                    </td>
+                    <td style="color:#6a8aa8;font-size:0.8rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        {{ e.resource or '—' }}
+                    </td>
+                    <td class="ip">{{ e.ip_address or '—' }}</td>
+                    <td class="status-{{ e.status }}">
+                        {{ '✓' if e.status == 'success' else '✗ فشل' }}
+                    </td>
+                    <td class="details-cell" title="{{ e.details or '' }}">
+                        {{ e.details or '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">لا توجد أحداث مطابقة للفلتر المحدد.</div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

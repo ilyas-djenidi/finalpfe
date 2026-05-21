@@ -1,0 +1,53 @@
+# ──────────────────────────────────────────────
+#  CyBrain Security — .gitignore
+# ──────────────────────────────────────────────
+
+# بيئات Python الافتراضية
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# متغيرات البيئة — لا ترفع هذا أبداً
+.env
+
+# قاعدة بيانات SQLite المحلية
+*.db
+*.db-shm
+*.db-wal
+
+# ملفات التقارير (لا تُرفع للمستودع)
+*.pdf
+*.docx
+
+# ملفات Python المُجمَّعة
+*.egg-info/
+dist/
+build/
+*.egg
+
+# سجلات وملفات مؤقتة
+*.log
+*.tmp
+*.bak
+tmp/
+
+# ملفات IDE / editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ملفات نظام التشغيل
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ملفات مستخرجة / مؤقتة من المشروع
+docx_extract.txt
+
+# تقارير وملفات تشغيلية
+*.pid

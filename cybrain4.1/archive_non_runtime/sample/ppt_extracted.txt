@@ -1,0 +1,52 @@
+=== ppt/slides/slide1.xml ===
+قسم الإعلام الآلي
+Department of Computer Science
+كلية الرياضيات والإعلام الآلي
+Faculty of Mathematics and Informatics
+الجمهورية الجزائرية الديمقراطية الشعبية
+The People’s Democratic Republic of Algeria
+وزرارة التعليم العالي والبحث العلمي
+Ministry of Higher Education and Scientific Research
+جامعة محمد بوضياف بالمسيلة
+University Mohamed Boudiaf of M’sila
+Domain:
+Mathematics and Computer Science
+Grade :
+Master in
+Networks
+and Information and  Communication Technologies "RTIC"
+Prepared By
+:
+………………………..
+Supervised By:
+Pr/Dr
+. …………………….
+PFE
+Title
+…………….
+Academic Year
+2025/2026
+
+=== ppt/slides/slide2.xml ===
+Remarque
+Ce n’est pas obligatoire de suivre le plan de
+présentation du prochaine
+slide
+, mais la présentation doit implicitement inclure tous les points.
+
+=== ppt/slides/slide3.xml ===
+Plan
+Introduction
+Présenter le
+contexte
+de votre projet de fin d’étude
+Objectif
+Expliquer privément les objectifs de votre projet.
+Méthodologie
+Donner les méthodes et le processus à suivre pour réaliser les objectifs de votre projet.
+Outils
+Présenter la liste de tous les outils utilisés pour développer/réaliser votre projet.
+Résultats
+Si vous avez arriver à des résultats, présenter les  brièvement dans cette section.
+Conclusion
+Présenter l’importance de votre projet

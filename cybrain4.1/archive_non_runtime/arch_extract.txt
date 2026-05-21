@@ -1,0 +1,193 @@
+[Normal] المراجعة المعمارية والهيكلية
+[Normal] مشروع NEXUS / CYBRAIN SECURITY — pfeV1.2
+[Normal] تحليل بنية الفحوصات • إعادة التصميم المقترحة • خارطة التطوير
+[Normal] مارس 2026
+[Heading 1] 1. تشريح البنية الحالية — ماذا يفعل كل scanner فعلاً؟
+[Normal] قبل اقتراح أي تغيير، يجب فهم ما يفعله كل scanner بالضبط وليس فقط ما يُقال عنه في الواجهة.
+[Heading 2] المشكلة الكبرى: التداخل وغياب الهوية المعمارية
+[Normal] المشروع الحالي يُقدّم 6 scanners لكنها في الحقيقة 4 فقط (network_ext ≈ network_int، و web ⊂ server_ext). هذا يطرح سؤالاً مشروعاً: ما الذي يُضيفه web على server_ext؟ الجواب الحالي: فحص الـ Cookies فقط. هذا غير مقنع.
+[Heading 1] 2. سؤال SSL/Headers — أين تضعها؟
+[Normal] هذا السؤال يبدو بسيطاً لكنه يكشف تمييزاً معمارياً دقيقاً وضرورياً.
+[Heading 2] الفرق المفاهيمي بين فحصين يبدوان متشابهين
+[Normal] المستوى الأول (Headers) هو مسؤولية المطوّر. المستوى الثاني (TLS infra) هو مسؤولية مسؤول النظام. هذان شيئان مختلفان.
+[Heading 2] ما الذي يفحصه المشروع حالياً؟
+[Heading 2] التوصية: وحدة SSL/TLS مشتركة + توزيع واضح
+[Normal] الحل الصحيح ليس "نضعها في web" أو "نضعها في server_ext" — بل نُنشئ ssl_tls_scanner.py كوحدة مشتركة تُستدعى من كلا المكانين بعمق مختلف:
+[Heading 1] 3. فحص الشبكة — لماذا هو بدائي وكيف نُصلحه؟
+[Heading 2] 3.1 المشكلة: "منفذ مفتوح" ≠ "ثغرة أمنية"
+[Normal] المشروع الحالي يُعامل كل منفذ مفتوح كـ Finding. هذا خطأ مفاهيمي جوهري:
+[Normal] المشكلة: الكود يُقيّم الخطورة بناءً على رقم المنفذ فقط (_assess_port_severity) دون أي اعتبار للسياق أو للخدمة أو لنوع الشبكة (إنترنت عام vs. شبكة داخلية).
+[Heading 2] 3.2 المشكلة: network_ext وnetwork_int متطابقان فعلياً
+[Normal] فحص "شبكة داخلية" بدون ARP discovery ولا subnet enumeration ولا live host detection = مجرد Nmap بطيء أكثر.
+[Heading 2] 3.3 ما يجب أن يفعله فحص الشبكة الحقيقي
+[Heading 3] الفحص الخارجي (External) — Threat Model: المهاجم من الإنترنت
+[List Paragraph] Port scan + Service fingerprinting (موجود ✓)
+[List Paragraph] Nmap NSE scripts للخدمات المكتشفة: --script=banner,http-headers,ssl-cert,ftp-anon,smtp-open-relay
+[List Paragraph] Service-version → CVE lookup: إذا وجدنا "OpenSSH 7.2" → نبحث عن CVEs لهذا الإصدار
+[List Paragraph] Context-aware severity: MySQL على الإنترنت = critical. MySQL على 127.0.0.1 = info
+[List Paragraph] تمييز: "Open Port" (معلومة) vs "Vulnerable Service" (ثغرة)
+[List Paragraph] Firewall/filtering detection: المنافذ المُفلتَرة vs المغلقة
+[Heading 3] الفحص الداخلي (Internal) — Threat Model: المهاجم داخل الشبكة
+[List Paragraph] ARP Sweep / Ping Sweep لاكتشاف الأجهزة الحية في الـ subnet
+[List Paragraph] Service scanning على كل جهاز مُكتشَف
+[List Paragraph] رصد: خدمات غير مُشفَّرة (Telnet, FTP, HTTP بدون S, SNMP v1/v2)
+[List Paragraph] رصد: credentials افتراضية (الـ script default لـ Nmap تُغطي بعضها)
+[List Paragraph] رصد: SMB shares مكشوفة، RDP مكشوف، databases بدون password
+[Heading 1] 4. SAST وDAST — هل نضيفهما وكيف؟
+[Heading 2] 4.1 ما هو الفرق؟
+[Heading 2] 4.2 SAST — الأداة المناسبة والتطبيق
+[Normal] آلية التطبيق في مشروعك:
+[List Paragraph] المستخدم يرفع ZIP لكود المصدر أو مجلد مضغوط
+[List Paragraph] يُستخرج في مجلد مؤقت محمي (مع أقصى حجم: 10MB)
+[List Paragraph] يُشغَّل Bandit: bandit -r /tmp/code -f json → نُحلّل الـ JSON output
+[List Paragraph] النتائج تُحوَّل إلى نفس format الـ vulnerabilities المعياري في مشروعك
+[List Paragraph] يُحذف المجلد المؤقت دائماً في finally block
+[Heading 2] 4.3 DAST — الأداة المناسبة والتطبيق
+[Normal] التوصية للـ PFE: ابدأ بـ Nikto (أسهل تركيب) كـ quick win، واذكر ZAP كـ roadmap للمرحلة التالية. التطبيق:
+[List Paragraph] المستخدم يُدخل URL تطبيق ويب يعمل
+[List Paragraph] subprocess.run(["nikto", "-h", url, "-Format", "json", "-output", tmp_file])
+[List Paragraph] نُحلّل المخرجات ونُحوّلها للـ format المعياري
+[List Paragraph] نُضيف تحذيراً واضحاً: "لا تستخدم هذا الفحص على تطبيق لا تملك تصريحاً بفحصه"
+[Heading 1] 5. البنية المعمارية المقترحة — التصميم الجديد
+[Normal] بناءً على كل ما سبق، هذا هو التصميم المقترح الذي يُعالج كل المشاكل ويُضيف قيمة حقيقية:
+[Normal] [ المنصة الأمنية ] — 4 أعمدة × 10 أنواع فحص
+[Heading 2] الفرق بين التصميمين — ماذا يكسب المشروع؟
+[Heading 1] 6. توصيات تفصيلية لكل مكوّن
+[Heading 2] 6.1 فحص الشبكة (A1 + A2) — إعادة بناء الـ severity logic
+[Normal] هذا التعديل يجب أن يحدث أولاً لأن الـ severity logic الحالي يُضلّل المستخدم:
+[Heading 2] 6.2 فحص الويب (B1 + B2 + B3) — إعادة التسمية والتوسيع
+[Heading 3] B1: Passive Web Reconnaissance (يُعيد تسمية web_scanner)
+[Normal] احتفظ بكل ما هو موجود + أضف:
+[List Paragraph] Sensitive Paths: ابحث عن /.git/, /.env, /phpinfo.php, /admin, /backup, /api/docs
+[List Paragraph] HTTP Methods: أرسل OPTIONS request وتحقق من TRACE/PUT/DELETE
+[List Paragraph] نقلهما من server_ext إلى هنا لأنهما فحوصات ويب بطبيعتهما
+[List Paragraph] فحص Cookies أكثر تفصيلاً: SameSite attribute، domain scope
+[List Paragraph] تفعيل cve_check option: إذا وجدنا Server header = "Apache/2.4.49" → أضف CVE-2021-41773 تلقائياً
+[Heading 3] B2: SAST Scanner (جديد — Bandit)
+[Normal] الكود الجوهري:
+[Heading 3] B3: DAST Scanner (جديد — Nikto)
+[List Paragraph] شرط أساسي: تأكيد المستخدم بأنه يملك صلاحية فحص الهدف (checkbox إلزامي)
+[List Paragraph] nikto -h {url} -Format csv -nointeractive -timeout 30
+[List Paragraph] تحديد المدة القصوى: subprocess timeout = 300 ثانية
+[List Paragraph] تصفية False Positives المعروفة من مخرجات Nikto
+[Heading 2] 6.3 فحص السيرفر (C1 + C2) — توضيح الهوية
+[Heading 3] C1: External Server Probe (يُعيد تسمية server_ext)
+[Normal] server_ext الحالي ممتاز في هذا الدور. التعديلات المطلوبة:
+[List Paragraph] احذف: فحص Security Headers منه (انقلها لـ B1)
+[List Paragraph] أبقِ: TLS/SSL التفصيلي (protocols, cipher suites) — هذا دوره الحقيقي
+[List Paragraph] أضف: فحص HSTS preloading (هل الدومين في قائمة preload browsers؟)
+[List Paragraph] أضف: DNSSEC check (هل DNS مُوقَّع؟)
+[List Paragraph] أضف: subdomain في Server header مكشوف؟
+[Heading 3] C2: Configuration Audit (يُبقي server_int + يُوسَّع)
+[List Paragraph] أضف دعم Nginx: nginx.conf يختلف صياغةً عن httpd.conf لكن المشاكل متشابهة
+[List Paragraph] أضف: فحص PHP settings (expose_php, allow_url_fopen, display_errors) إذا وُجد php.ini
+[List Paragraph] ميزة generate_fixed_config موجودة وممتازة — وسّعها لـ Nginx
+[Heading 2] 6.4 فحص التبعيات (D1) — إصلاح الأخطاء الموجودة
+[List Paragraph] أصلح السطر 293: severity = vuln.get("severity", "high") بدل التعبير الخاطئ
+[List Paragraph] حدّث KNOWN_VULNS: jinja2 range خاطئ (CVE-2024-34064 ظهرت في 3.1.3 وليس 3.1.0)
+[List Paragraph] أضف آلية تحديث: مهما كانت القاعدة المحلية ستصبح قديمة → pip-audit هو المصدر الأساسي
+[List Paragraph] أضف npm audit للـ package.json بدلاً من القاعدة المحلية فقط
+[Heading 1] 7. خارطة التطوير — ماذا تبدأ به؟
+[Heading 1] 8. الخلاصة
+[Normal] البنية الحالية تُظهر جهداً حقيقياً لكنها تعاني من مشكلة واحدة رئيسية: الفحوصات لم تُبنَ انطلاقاً من نموذج تهديد (Threat Model) واضح، بل جُمعت من أدوات مختلفة. النتيجة: تداخل وعدم وضوح في الهوية المعمارية.
+[Normal] الحل ليس إضافة أدوات أكثر — بل إعادة التنظيم حول 4 أعمدة مفاهيمية واضحة (شبكة / ويب / سيرفر / supply chain)، مع إصلاح الأخطاء الموجودة، ثم إضافة SAST و DAST بشكل منطقي ضمن عمود الويب.
+[Normal] بهذا التصميم، كل فحص يُجيب عن سؤال مختلف: هل شبكتي مكشوفة؟ هل كودي يحتوي ثغرات؟ هل تطبيقي المنشور آمن؟ هل خادمي مُهيَّأ بصح؟ هل مكتباتي قديمة؟ — خمسة أسئلة واضحة، خمسة إجابات مختلفة.
+
+=== Table 1 ===
+هذا التقرير يُجيب على ثلاثة أسئلة جوهرية: ① ما المشاكل المعمارية في البنية الحالية للفحوصات؟ ② أين يجب أن تقع فحوصات SSL/Headers — في web، server، أم في كليهما؟ ③ كيف نُعيد تصميم المشروع ليكون شاملاً ومقنعاً علمياً وتقنياً؟
+
+=== Table 2 ===
+Scanner | ما يفعله فعلاً (بعد قراءة الكود) | المشكلة الجوهرية
+network_ext | Nmap: يسرد المنافذ المفتوحة وأسماء الخدمات. يُقيّم الخطورة بالرقم فقط (port 443 → medium!) | لا فحص للثغرات. port severity خاطئ منطقياً. لا NSE scripts.
+network_int | نفس network_ext تماماً مع args مختلفة قليلاً (-T3 بدل -T4) | مكرر. الفرق المفاهيمي بين داخلي/خارجي غير مُترجَم في الكود.
+web | HTTP GET → فحص Security Headers + SSL cert expiry + Cookies flags + CORS | يتداخل كلياً مع server_ext. cve_check option موجود في الواجهة لكن الكود يتجاهله تماماً.
+server_ext | Nmap + HTTP GET → نفس Headers/SSL + Sensitive Paths + HTTP Methods + Apache CVEs | يحتوي كل ما في web وأكثر → web يُصبح subset بلا معنى مستقل.
+server_int | قراءة httpd.conf نصياً + تحليل 10 أنواع من الإعدادات + توليد إصلاح تلقائي | ✓ الأنظف والأوضح. مشكلة: Apache فقط، لا Nginx.
+dependencies | pip-audit (إن وُجد) + قاعدة CVE محلية لـ 15 حزمة | قاعدة CVE بعض نطاقاتها خاطئة. pip-audit severity bug (كل شيء = high).
+
+=== Table 3 ===
+المستوى | الفحص
+مستوى التطبيق (App Layer) | هل التطبيق يُرسل Security Headers صحيحة؟ → CSP، HSTS، X-Frame-Options، Referrer-Policy، Permissions-Policy
+مستوى البنية التحتية (Infra Layer) | هل السيرفر نفسه مُهيَّأ بإحكام؟ → TLS protocol versions، Cipher suites، Certificate chain، OCSP stapling، HSTS preloading في DNS
+
+=== Table 4 ===
+web_scanner.py:  Security Headers (6 headers) + SSL cert expiry فقط server_ext.py:   نفس الـ 6 headers بطريقة مختلفة + _check_tls() التي تفحص SSL cert expiry + TLS protocol version فقط server_int.py:   SSLProtocol + SSLCipherSuite + SSLHonorCipherOrder في ملف الإعدادات  → لا أحد منهم يفحص: Cipher suite strength فعلياً من الخارج، HSTS preloading، Certificate Transparency، OCSP stapling.
+
+=== Table 5 ===
+من أين تُستدعى | ما الذي تفحصه في هذا السياق
+web_scanner (مستوى التطبيق) | شهادة صالحة؟ HSTS header موجود؟ CSP صحيح؟ → أسئلة تطبيقية
+server_ext (مستوى الخادم) | TLS 1.0/1.1 مُفعَّل؟ Cipher suites ضعيفة؟ HSTS preloading؟ Certificate chain كامل؟ → أسئلة بنية تحتية
+server_int (مستوى الإعدادات) | SSLProtocol صحيح في httpd.conf؟ SSLCipherSuite يستبعد RC4 و DES؟ → أسئلة configuration
+
+=== Table 6 ===
+الخلاصة العملية لمشروعك: • Security Headers (CSP, HSTS header, X-Frame-Options...) → ابقِها في web_scanner. هي خاصية تطبيق. • SSL/TLS التفصيلي (cipher suites, protocols, certificate chain) → انقلها إلى server_ext. هي خاصية خادم. • في server_ext الحالي: اجمع الـ Headers والـ TLS معاً — هذا منطقي لأن server_ext يفحص البنية التحتية كلها. • النتيجة: web = فحص ما يُبنيه المطوّر. server = فحص ما يُهيّئه مسؤول النظام.
+
+=== Table 7 ===
+منفذ 443 (HTTPS) مفتوح → المشروع يقول: severity = medium ← هذا سخيف. منفذ 22 (SSH) مفتوح → severity = medium ← لكن SSH على الإنترنت هو خطر فعلي يستحق تحليلاً أعمق. منفذ 3306 (MySQL) مفتوح للإنترنت → severity = medium ← هذا في الواقع critical! منفذ 8080 مفتوح → severity = medium ← نعم لكن ما الخدمة التي تعمل عليه؟
+
+=== Table 8 ===
+network_ext | network_int
+-sV --open -T4 --top-ports 1000 | -sV --open -T3
+نفس الكود، نفس الـ severity logic | نفس الكود، نفس الـ severity logic
+لا فرق مفاهيمي في المخرجات | لا فرق مفاهيمي في المخرجات
+
+=== Table 9 ===
+الحل العملي لـ PFE: أضف --script=default لـ Nmap (يُشغّل ~200 script آمن) وأضف قاعدة بسيطة: إذا وجدنا service + version → ابحث في KNOWN_VULNS المحلية وصحّح severity logic: المنافذ ذات الخدمات الشبكية العارية (DB, cache, admin) على IP عام = critical/high أما HTTP/HTTPS/SSH فهي "معلومة" وليست "ثغرة" بحد ذاتها → انقلها إلى info list
+
+=== Table 10 ===
+النوع | التعريف والمثال
+SAST — Static Application Security Testing | تحليل الكود المصدري أو bytecode قبل التشغيل. مثال: Bandit يجد f"SELECT * FROM users WHERE id={user_id}" ويُنبّه SQL Injection.
+DAST — Dynamic Application Security Testing | اختبار التطبيق وهو يعمل عبر إرسال طلبات HTTP حقيقية. مثال: OWASP ZAP يُرسل payloads ويكتشف XSS وSQL Injection فعلياً.
+الفرق الجوهري | SAST = تحليل بدون تشغيل. DAST = اختبار أثناء التشغيل. كلاهما ضروري ومكمّل للآخر.
+
+=== Table 11 ===
+الأداة المقترحة: Bandit (Python فقط) + Semgrep (متعدد اللغات، مفتوح المصدر)  Bandit: pip install bandit  →  bandit -r . -f json   يكتشف: SQL injection، Hard-coded passwords، Pickle deserialization،           os.system() calls، eval()، XML injection، Weak crypto (MD5/SHA1)...  Semgrep: يدعم Python، JS، Java، Go، PHP... → semgrep --config=p/owasp-top-ten .   يكتشف: OWASP Top 10 patterns، framework-specific vulns، custom rules
+
+=== Table 12 ===
+الأداة | المميزات والعيوب في سياق PFE
+OWASP ZAP | ✓ الأقوى والأكثر شمولاً. ✓ API كاملة. ✗ يتطلب Java. ✗ ثقيل (500MB+). ✗ يحتاج وقتاً طويلاً للـ full scan.
+Nikto | ✓ خفيف جداً (Perl script). ✓ سريع. ✓ يكتشف الأساسيات. ✗ لا API رسمية. ✗ يولّد false positives كثيرة.
+ZAP في Baseline Mode | ✓ ZAP لكن في وضع Passive فقط (لا هجمات نشطة). ✓ آمن. ✓ سريع نسبياً (2-5 دقائق). → التوصية لـ PFE
+
+=== Table 13 ===
+🌐 A. الشبكة Network Layer | 🔍 B. الويب Web App Layer | 🖥 C. السيرفر Server Layer | 📦 D. سلسلة التوريد Supply Chain
+A1: External Scan Ports + Services + NSE Scripts + CVE Match A2: Internal Scan ARP + Subnet + Exposed Services | B1: Passive Recon Headers + SSL + Cookies + CORS B2: SAST Bandit + Semgrep (كود مرفوع) B3: DAST Nikto / ZAP (تطبيق يعمل) | C1: External Probe Paths + Methods + TLS + Apache CVEs C2: Config Audit httpd.conf / nginx.conf (white-box) | D1: Dependency Scan pip-audit + npm audit + local CVE DB
+🔧 مطلوب: Nmap + تطوير severity logic + CVE match | 🔧 B1: موجود (تنظيف). B2: Bandit. B3: Nikto | 🔧 C1: موجود (إعادة تسمية). C2: أضف Nginx | 🔧 موجود (إصلاح bugs)
+
+=== Table 14 ===
+الجانب | البنية الحالية | البنية المقترحة
+عدد الفحوصات المستقلة | 6 (منها 2 متطابقان فعلياً) | 10 متمايزة مفاهيمياً
+تغطية OWASP Top 10 | جزئية جداً (Headers فقط) | شاملة: A01-A09 عبر SAST+DAST
+تحليل الكود المصدري | غائب تماماً | Bandit + Semgrep
+فحص ديناميكي فعلي | غائب | Nikto / ZAP
+فحص الشبكة | port list فقط | Port + Service CVE + Context severity
+وضوح الهوية | web ≈ server_ext → تداخل | كل عمود له هوية مستقلة
+SSL/TLS | cert expiry فقط (passive) | Full TLS analysis في server_ext
+
+=== Table 15 ===
+الحالة | الحكم الصحيح
+port 80/443 مفتوح (HTTP/HTTPS) | INFO — ليست ثغرة. السيرفر يعمل بشكل طبيعي.
+port 22 (SSH) على IP عام | MEDIUM إذا الإصدار حديث. HIGH إذا OpenSSH < 7.0 أو PasswordAuth مُفعَّل.
+port 23 (Telnet) على أي شبكة | CRITICAL — بروتوكول غير مُشفَّر تماماً.
+port 3306 (MySQL) على IP عام | CRITICAL — database مكشوفة للإنترنت.
+port 6379 (Redis) على IP عام | CRITICAL — Redis بدون auth افتراضياً.
+port 27017 (MongoDB) على IP عام | CRITICAL — تاريخ من الـ data breaches.
+port 21 (FTP) أي مكان | HIGH — بروتوكول غير مُشفَّر + Anonymous login شائع.
+port 3389 (RDP) على IP عام | HIGH — هجمات brute force مستمرة.
+
+=== Table 16 ===
+التوصية: أضف دالة _assess_service_severity(port, service, version, is_public_ip) بدلاً من _assess_port_severity(port, service) is_public_ip = True إذا كان الـ target IP غير private (ليس 10.x.x.x, 172.16.x.x, 192.168.x.x) هذا التمييز وحده يرفع جودة الـ scanner بشكل كبير.
+
+=== Table 17 ===
+import subprocess, json, tempfile, zipfile  def run_sast_scan(zip_path: str) -> dict:     with tempfile.TemporaryDirectory() as tmpdir:         with zipfile.ZipFile(zip_path) as z:             z.extractall(tmpdir)         result = subprocess.run(             ["bandit", "-r", tmpdir, "-f", "json", "-ll"],             capture_output=True, text=True, timeout=120         )         data = json.loads(result.stdout)         return _parse_bandit_output(data)
+
+=== Table 18 ===
+المرحلة والمدة | ما تفعله
+🔴 المرحلة 0 (يوم 1) الإصلاحات الطارئة | • احذف .env من الكود • أصلح السطر 293 في dep_scanner.py • غيّر _assess_port_severity لتكون context-aware
+🟠 المرحلة 1 (أسبوع 1) إعادة التنظيم | • أعد تسمية web_scanner → passive_web_scanner • انقل Sensitive Paths وHTTP Methods من server_ext إلى web • فصل SSL/TLS الكامل في ssl_tls_module.py مشترك • صحّح severity logic للشبكة
+🟡 المرحلة 2 (أسبوع 2-3) إضافة SAST | • أضف B2: Bandit SAST scanner • واجهة رفع ZIP • تحويل Bandit JSON output للـ format المعياري • أضف Semgrep كـ optional tool
+🟢 المرحلة 3 (أسبوع 3-4) إضافة DAST | • أضف B3: Nikto DAST scanner • تحذير قانوني + checkbox إلزامي • Timeout management • تصفية false positives
+🔵 المرحلة 4 (إضافة قيمة) توسيع إن أتاح الوقت | • C2: دعم Nginx config • A1+A2: --script=default في Nmap + service CVE lookup • D1: npm audit integration
+
+=== Table 19 ===
+ملاحظة مهمة حول جدوى PFE:  مشروعك يُقيّم في سياق أكاديمي. إضافة SAST (Bandit) وحدها = تُغطي OWASP A04 و A06 وتُميّز مشروعك عن معظم مشاريع الـ PFE المشابهة التي تقتصر على Nmap + web headers.  إضافة DAST حتى بـ Nikto = تُغطي OWASP A01-A03 وتُعطي المشروع بُعداً عملياً تفاعلياً.  التوصية: ركّز على المرحلتين 0 و 1 أولاً (ضروريتان)، ثم المرحلة 2 (SAST) كأولوية قصوى.
