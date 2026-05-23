@@ -9,7 +9,10 @@
       "Bash(Get-ChildItem \"C:\\\\Users\\\\len\\\\Desktop\\\\cybrain\\\\cybrain4.1\" -Recurse -Name)",
       "Bash(Sort-Object)",
       "Bash(find /mnt/c/Users/len/Desktop/cybrain/cybrain4.1 -type f | sort)",
-      "Read(//mnt/c/Users/len/Desktop/cybrain/**)"
+      "Read(//mnt/c/Users/len/Desktop/cybrain/**)",
+      "Bash(python -m py_compile web_scanner.py)",
+      "Bash(python -m py_compile dast_scanner.py)",
+      "Bash(python -m py_compile dep_scanner.py)"
     ]
   }
 }

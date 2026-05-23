@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyBrain — إدارة الفحوصات</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: #080c14;
+            color: #c8d8e8;
+            direction: rtl;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+        .nav {
+            background: #020408;
+            border-bottom: 2px solid #ff440033;
+            padding: 14px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .nav-brand { color: #ff6644; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-decoration: none; }
+        .nav-links a { color: #7fa8c8; text-decoration: none; margin-right: 20px; font-size: 0.88rem; transition: color 0.2s; }
+        .nav-links a:hover, .nav-links a.active { color: #ff6644; }
+        .nav-badge { display: inline-block; background: #ff440022; color: #ff6644; border: 1px solid #ff440044; border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; margin-right: 8px; }
+        .nav-user { color: #4a6a8a; font-size: 0.82rem; }
+        .page { max-width: 1200px; margin: 32px auto; padding: 0 16px; }
+        .page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #1e3a5a; }
+        .page-header .icon { font-size: 2rem; }
+        .page-header h1 { font-size: 1.4rem; color: #ff6644; font-weight: 700; }
+        .page-header p { color: #4a6a8a; font-size: 0.85rem; }
+
+        .flash { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.88rem; }
+        .flash-error   { background: #ff444422; border: 1px solid #ff444466; color: #ff6666; }
+        .flash-success { background: #00c85322; border: 1px solid #00c85366; color: #66bb6a; }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; }
+        .filter-group label { font-size: 0.75rem; color: #4a8ab0; letter-spacing: 1px; }
+        .filter-group input, .filter-group select {
+            background: #0a1520;
+            border: 1px solid #1e3a5a;
+            color: #c8d8e8;
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            min-width: 140px;
+        }
+        .filter-group input:focus, .filter-group select:focus { outline: none; border-color: #ff6644; }
+        .btn { padding: 8px 18px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; border: none; font-weight: 600; text-decoration: none; display: inline-block; }
+        .btn-primary { background: linear-gradient(135deg, #ff6644, #cc3311); color: #fff; }
+        .btn-ghost   { background: transparent; border: 1px solid #1e3a5a; color: #7fa8c8; }
+        .btn-danger  { background: #ff444422; border: 1px solid #ff444455; color: #ff6666; font-size: 0.78rem; padding: 4px 10px; }
+        .btn-danger:hover { background: #ff444433; }
+        .btn-view    { background: #00f5ff11; border: 1px solid #00f5ff44; color: #00f5ff; font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; text-decoration: none; }
+        .btn-view:hover { background: #00f5ff22; }
+
+        /* Stats Strip */
+        .stats-strip {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .stat-chip {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-size: 0.85rem;
+        }
+        .stat-chip .val { font-size: 1.3rem; font-weight: 700; color: #00f5ff; }
+
+        /* Table */
+        .table-wrap {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            background: #0a1520;
+            color: #4a8ab0;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 12px 14px;
+            text-align: right;
+        }
+        td { padding: 10px 14px; border-bottom: 1px solid #1a2e44; font-size: 0.83rem; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #0d1e30; }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
+        .badge-critical { background: #ff444422; color: #ff6666; border: 1px solid #ff444444; }
+        .badge-high     { background: #ff8c0022; color: #ffaa44; border: 1px solid #ff8c0044; }
+        .badge-medium   { background: #f5c51822; color: #f5c518; border: 1px solid #f5c51844; }
+        .badge-info     { background: #00bcd422; color: #26c6da; border: 1px solid #00bcd444; }
+
+        .scan-type {
+            font-size: 0.72rem; color: #4a8ab0;
+            background: #0a1520; padding: 2px 8px;
+            border-radius: 4px; border: 1px solid #1e3a5a;
+        }
+        .risk-score { font-weight: 700; }
+        .rs-critical { color: #ff4444; }
+        .rs-high     { color: #ff8c00; }
+        .rs-medium   { color: #f5c518; }
+        .rs-low      { color: #00c853; }
+
+        .td-user { color: #7c6af5; font-weight: 600; }
+        .td-date { color: #4a8ab0; font-size: 0.77rem; white-space: nowrap; }
+        .td-target { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .empty { text-align: center; padding: 48px; color: #3a5a7a; }
+        .empty .icon { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.4; }
+
+        /* Delete confirmation dialog */
+        .del-form { display: inline; }
+    </style>
+</head>
+<body>
+
+<nav class="nav">
+    <a href="/admin" class="nav-brand"><span class="nav-badge">ADMIN</span> CyBrain</a>
+    <div class="nav-links">
+        <a href="/admin">الرئيسية</a>
+        <a href="/admin/users">المستخدمون</a>
+        <a href="/admin/scans" class="active">الفحوصات</a>
+        <a href="/admin/audit">سجل التدقيق</a>
+        <a href="/logout">خروج</a>
+    </div>
+    <div class="nav-user">المشرف: {{ user }}</div>
+</nav>
+
+<div class="page">
+
+    <!-- Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for category, message in messages %}
+    <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}{% endif %}{% endwith %}
+
+    <!-- Header -->
+    <div class="page-header">
+        <div class="icon">🔍</div>
+        <div>
+            <h1>إدارة الفحوصات</h1>
+            <p>عرض وحذف جميع فحوصات النظام من كل المستخدمين</p>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <form method="GET" action="/admin/scans">
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>المستخدم</label>
+                <input type="text" name="user" value="{{ filter_user }}" placeholder="اسم المستخدم...">
+            </div>
+            <div class="filter-group">
+                <label>نوع الفحص</label>
+                <select name="type">
+                    <option value="">— الكل —</option>
+                    {% for t in ['network_ext','network_int','web','server_ext','server_int','dependencies','sast','dast'] %}
+                    <option value="{{ t }}" {% if filter_type == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">تصفية</button>
+            <a href="/admin/scans" class="btn btn-ghost">إعادة ضبط</a>
+        </div>
+    </form>
+
+    <!-- Stats Strip -->
+    <div class="stats-strip">
+        <div class="stat-chip"><div class="val">{{ reports | length }}</div><div>فحص معروض</div></div>
+        {% if reports %}
+        <div class="stat-chip">
+            <div class="val">{{ reports | selectattr('critical_count') | list | length }}</div>
+            <div>فحوصات بثغرات حرجة</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Table -->
+    {% if reports %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>المستخدم</th>
+                    <th>الهدف</th>
+                    <th>النوع</th>
+                    <th>Risk Score</th>
+                    <th>الثغرات</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in reports %}
+            {% set score = r.risk_score | float %}
+            <tr>
+                <td class="td-date">{{ r.stored_at[:16].replace('T',' ') if r.stored_at else '—' }}</td>
+                <td class="td-user">{{ r.username or '—' }}</td>
+                <td class="td-target">{{ r.target or '—' }}</td>
+                <td><span class="scan-type">{{ r.scan_type or '—' }}</span></td>
+                <td>
+                    <span class="risk-score {% if score >= 7.5 %}rs-critical{% elif score >= 5.0 %}rs-high{% elif score >= 2.5 %}rs-medium{% else %}rs-low{% endif %}">
+                        {{ "%.1f"|format(score) }}
+                    </span>
+                </td>
+                <td>
+                    {% if r.critical_count %}<span class="badge badge-critical">{{ r.critical_count }} C</span> {% endif %}
+                    {% if r.high_count %}<span class="badge badge-high">{{ r.high_count }} H</span> {% endif %}
+                    {% if r.medium_count %}<span class="badge badge-medium">{{ r.medium_count }} M</span> {% endif %}
+                    {% if not r.critical_count and not r.high_count and not r.medium_count %}
+                    <span class="badge badge-info">{{ r.vuln_count or 0 }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        {% if r.token %}
+                        <a href="/report/{{ r.token }}" class="btn-view" target="_blank">عرض</a>
+                        <form class="del-form" method="POST" action="/admin/scans/{{ r.token }}/delete"
+                              onsubmit="return confirm('هل أنت متأكد من حذف هذا الفحص؟ لا يمكن التراجع.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger">حذف</button>
+                        </form>
+                        {% else %}
+                        <span style="color:#3a5a7a;">—</span>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="icon">🔍</div>
+        <p>لا توجد فحوصات تطابق المرشّحات المحددة</p>
+    </div>
+    {% endif %}
+
+</div>
+</body>
+</html>

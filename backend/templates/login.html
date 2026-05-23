@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>CyBrain — تسجيل الدخول</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/static/css/variables.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+
+    <style>
+        .login-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--sp-xl);
+        }
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: var(--sp-4xl);
+            position: relative;
+            overflow: hidden;
+            animation: fadeUp 0.6s ease both;
+        }
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+        }
+        .login-title {
+            font-family: var(--font-display);
+            font-size: var(--fs-2xl);
+            color: var(--accent-cyan);
+            letter-spacing: 4px;
+            margin-bottom: var(--sp-xs);
+        }
+        .login-sub {
+            font-family: var(--font-mono);
+            font-size: var(--fs-xs);
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            margin-bottom: var(--sp-3xl);
+        }
+        .login-field { margin-bottom: var(--sp-xl); }
+        .login-input {
+            width: 100%;
+            background: rgba(0,0,0,0.40);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: var(--fs-md);
+            padding: 12px var(--sp-lg);
+            transition: var(--transition-base);
+            letter-spacing: 1px;
+            direction: ltr;
+        }
+        .login-input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+        .login-input::placeholder { color: rgba(74,122,138,0.5); }
+        .login-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            font-family: var(--font-display);
+            font-size: var(--fs-lg);
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            padding: 14px;
+            cursor: pointer;
+            transition: var(--transition-base);
+            overflow: hidden;
+            position: relative;
+            margin-top: var(--sp-md);
+        }
+        .login-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--accent-cyan);
+            transform: translateX(-101%);
+            transition: var(--transition-slow);
+        }
+        .login-btn:hover::before { transform: translateX(0); }
+        .login-btn:hover { color: var(--bg-primary); box-shadow: var(--glow-cyan); }
+        .login-btn span { position: relative; z-index: 1; }
+        .flash-messages { margin-bottom: var(--sp-xl); }
+        .flash-msg {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-sm);
+            padding: 10px var(--sp-md);
+            border: 1px solid var(--accent-red);
+            background: rgba(255, 45, 85, 0.05);
+            color: var(--accent-red);
+            font-family: var(--font-mono);
+            font-size: var(--fs-sm);
+            animation: slideIn 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+<div class="particles" id="particles" aria-hidden="true"></div>
+
+<div class="login-wrapper">
+    <div class="login-card">
+
+        <!-- Corner decorations -->
+        <div class="corner corner-tl" aria-hidden="true"></div>
+        <div class="corner corner-tr" aria-hidden="true"></div>
+        <div class="corner corner-bl" aria-hidden="true"></div>
+        <div class="corner corner-br" aria-hidden="true"></div>
+
+        <div class="login-title">CYBRAIN</div>
+        <div class="login-sub">SECURITY ASSESSMENT PLATFORM</div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="flash-messages" role="alert">
+                {% for msg in messages %}
+                <div class="flash-msg"><span>✗</span><span>{{ msg }}</span></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}" autocomplete="off" novalidate>
+            {{ form.hidden_tag() }}
+
+            <div class="login-field">
+                <label class="field-label" for="username">
+                    <span class="icon" aria-hidden="true">◈</span> اسم المستخدم
+                </label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    class="login-input"
+                    placeholder="username"
+                    required
+                    autocomplete="username"
+                    aria-required="true"
+                >
+            </div>
+
+            <div class="login-field">
+                <label class="field-label" for="password">
+                    <span class="icon" aria-hidden="true">◈</span> كلمة المرور
+                </label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="login-input"
+                    placeholder="••••••••"
+                    required
+                    autocomplete="current-password"
+                    aria-required="true"
+                >
+            </div>
+
+            <button type="submit" class="login-btn" aria-label="تسجيل الدخول">
+                <span>AUTHENTICATE</span>
+            </button>
+        </form>
+
+        <div class="terminal-line">
+            <span class="terminal-prompt" aria-hidden="true">cybrain@sec:~$</span>
+            <span class="terminal-status">awaiting_auth</span>
+            <span class="terminal-cursor" aria-hidden="true"></span>
+        </div>
+
+    </div>
+</div>
+
+<script src="/static/js/config.js" defer></script>
+<script src="/static/js/utils.js" defer></script>
+<script src="/static/js/particles.js" defer></script>
+
+<script defer>
+    window.addEventListener('DOMContentLoaded', () => {
+        if (window.Particles) {
+            window.Particles.init(document.getElementById('particles'));
+        }
+    });
+</script>
+
+</body>
+</html>
+

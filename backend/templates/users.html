@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyBrain — إدارة المستخدمين</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: #0a0e1a;
+            color: #c8d8e8;
+            direction: rtl;
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .nav {
+            background: #020408;
+            border-bottom: 2px solid #00f5ff22;
+            padding: 14px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-brand { color: #00f5ff; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-decoration: none; }
+        .nav-links a { color: #7fa8c8; text-decoration: none; margin-right: 20px; font-size: 0.88rem; transition: color 0.2s; }
+        .nav-links a:hover { color: #00f5ff; }
+        .nav-user { color: #4a6a8a; font-size: 0.82rem; }
+
+        .page { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
+
+        .section-title {
+            font-size: 1rem;
+            color: #00f5ff;
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e3a5a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ── Create User Panel ── */
+        .create-panel {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 28px;
+        }
+        .create-panel h3 { color: #00f5ff; font-size: 0.95rem; margin-bottom: 16px; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.8rem; color: #6a8aa8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-group input, .form-group select {
+            background: #0a1520;
+            border: 1px solid #1e3a5a;
+            color: #c8d8e8;
+            padding: 9px 12px;
+            border-radius: 6px;
+            font-size: 0.88rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: #00f5ff66; }
+        .btn {
+            padding: 9px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #00f5ff22; color: #00f5ff; border: 1px solid #00f5ff44; }
+        .btn-primary:hover { background: #00f5ff33; }
+        .btn-danger  { background: #ff444422; color: #ff6666; border: 1px solid #ff444444; }
+        .btn-danger:hover  { background: #ff444433; }
+        .btn-warning { background: #f5c51822; color: #f5c518; border: 1px solid #f5c51844; }
+        .btn-warning:hover { background: #f5c51833; }
+        .btn-success { background: #00c85322; color: #4caf50; border: 1px solid #00c85344; }
+        .btn-success:hover { background: #00c85333; }
+        .btn-sm { padding: 5px 14px; font-size: 0.78rem; }
+        .form-actions { margin-top: 16px; }
+
+        /* ── Users Table ── */
+        .table-wrap {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 28px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            background: #0a1520;
+            color: #4a8ab0;
+            font-size: 0.78rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 12px 16px;
+            text-align: right;
+        }
+        td { padding: 11px 16px; border-bottom: 1px solid #1a2e44; font-size: 0.87rem; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #0d1e30; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.73rem;
+            font-weight: 600;
+        }
+        .badge-admin   { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed44; }
+        .badge-analyst { background: #00f5ff22; color: #00f5ff; border: 1px solid #00f5ff44; }
+        .badge-viewer  { background: #64748b22; color: #94a3b8; border: 1px solid #64748b44; }
+        .badge-active  { background: #00c85322; color: #4caf50; border: 1px solid #00c85344; }
+        .badge-inactive{ background: #ff444422; color: #ff6666; border: 1px solid #ff444444; }
+
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: #00000099;
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #111827;
+            border: 1px solid #1e3a5a;
+            border-radius: 12px;
+            padding: 28px;
+            width: min(460px, 90vw);
+        }
+        .modal h4 { color: #00f5ff; margin-bottom: 16px; }
+        .modal .form-group { margin-bottom: 14px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+        /* ── Flash ── */
+        .flash-list { list-style: none; margin-bottom: 16px; }
+        .flash-item {
+            padding: 10px 16px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.88rem;
+        }
+        .flash-success { background: #00c85322; color: #4caf50; border: 1px solid #00c85344; }
+        .flash-error   { background: #ff444422; color: #ff6666; border: 1px solid #ff444444; }
+
+        .empty-state { text-align: center; padding: 40px; color: #4a6a8a; }
+    </style>
+</head>
+<body>
+
+<nav class="nav">
+    <a href="/" class="nav-brand">◈ CYBRAIN</a>
+    <div class="nav-links">
+        <a href="/">الفحص</a>
+        <a href="/dashboard">لوحة التحكم</a>
+        <a href="/admin/users" style="color:#00f5ff">المستخدمون</a>
+        <a href="/admin/audit">سجل التدقيق</a>
+        <a href="/logout">خروج</a>
+    </div>
+    <div class="nav-user">المشرف: {{ user }}</div>
+</nav>
+
+<div class="page">
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <ul class="flash-list">
+        {% for category, message in messages %}
+        <li class="flash-item flash-{{ category }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Create User -->
+    <div class="create-panel">
+        <h3>＋ إضافة مستخدم جديد</h3>
+        <form method="POST" action="/admin/users/create">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>اسم المستخدم</label>
+                    <input type="text" name="username" required minlength="3" maxlength="50"
+                           placeholder="username" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>كلمة المرور</label>
+                    <input type="password" name="password" required minlength="8"
+                           placeholder="8 أحرف على الأقل">
+                </div>
+                <div class="form-group">
+                    <label>تأكيد كلمة المرور</label>
+                    <input type="password" name="confirm_password" required minlength="8"
+                           placeholder="أعد كتابة كلمة المرور">
+                </div>
+                <div class="form-group">
+                    <label>الدور</label>
+                    <select name="role">
+                        <option value="analyst">محلل أمني (Analyst)</option>
+                        <option value="viewer">مشاهد فقط (Viewer)</option>
+                        <option value="admin">مشرف (Admin)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">إنشاء المستخدم</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Users Table -->
+    <div class="section-title">
+        <span>◈</span> قائمة المستخدمين
+        <span style="color:#4a6a8a;font-size:0.8rem;font-weight:400;margin-right:auto">
+            {{ users|length }} مستخدم
+        </span>
+    </div>
+
+    <div class="table-wrap">
+        {% if users %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>اسم المستخدم</th>
+                    <th>الدور</th>
+                    <th>الحالة</th>
+                    <th>آخر دخول</th>
+                    <th>عدد الجلسات</th>
+                    <th>أُنشئ في</th>
+                    <th>أُنشئ بواسطة</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td style="color:#4a6a8a">{{ u.id }}</td>
+                    <td style="font-weight:600;color:#e2e8f0">{{ u.username }}</td>
+                    <td>
+                        <span class="badge badge-{{ u.role }}">{{ u.role }}</span>
+                    </td>
+                    <td>
+                        {% if u.is_active %}
+                        <span class="badge badge-active">مفعّل</span>
+                        {% else %}
+                        <span class="badge badge-inactive">معطّل</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:#6a8aa8;font-size:0.82rem">
+                        {{ u.last_login[:19].replace('T',' ') if u.last_login else 'لم يدخل بعد' }}
+                    </td>
+                    <td style="color:#6a8aa8;text-align:center">{{ u.login_count or 0 }}</td>
+                    <td style="color:#6a8aa8;font-size:0.82rem">
+                        {{ u.created_at[:10] if u.created_at else '—' }}
+                    </td>
+                    <td style="color:#6a8aa8;font-size:0.82rem">{{ u.created_by }}</td>
+                    <td>
+                        <div class="actions">
+                            <!-- Reset Password -->
+                            <button class="btn btn-sm btn-warning"
+                                    onclick="openResetModal({{ u.id }}, '{{ u.username }}')">
+                                كلمة مرور
+                            </button>
+                            <!-- Change Role -->
+                            <button class="btn btn-sm btn-success"
+                                    onclick="openRoleModal({{ u.id }}, '{{ u.username }}', '{{ u.role }}')">
+                                الدور
+                            </button>
+                            <!-- Edit Permissions -->
+                            <button class="btn btn-sm" style="background:#7c6af522;color:#a78bfa;border:1px solid #7c6af544;"
+                                    onclick="openPermsModal({{ u.id }}, '{{ u.username }}', {{ u.permissions | tojson }})">
+                                صلاحيات
+                            </button>
+                            <!-- Toggle Active -->
+                            {% if u.id != 1 %}
+                            <button class="btn btn-sm {{ 'btn-danger' if u.is_active else 'btn-primary' }}"
+                                    onclick="toggleUser({{ u.id }}, this)">
+                                {{ 'إيقاف' if u.is_active else 'تفعيل' }}
+                            </button>
+                            <!-- Hard Delete -->
+                            <form method="POST" action="/admin/users/{{ u.id }}/delete" style="display:inline;"
+                                  onsubmit="return confirm('حذف نهائي: سيتم حذف كل بيانات المستخدم {{ u.username }}. لا يمكن التراجع!')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">لا يوجد مستخدمون</div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="resetModal">
+    <div class="modal">
+        <h4>إعادة ضبط كلمة المرور</h4>
+        <p style="color:#6a8aa8;font-size:0.85rem;margin-bottom:16px">
+            المستخدم: <strong id="resetUsername" style="color:#e2e8f0"></strong>
+        </p>
+        <div class="form-group">
+            <label>كلمة المرور الجديدة</label>
+            <input type="password" id="newPassword" minlength="8" placeholder="8 أحرف على الأقل">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-warning" onclick="submitReset()">تأكيد</button>
+            <button class="btn" onclick="closeModal('resetModal')"
+                    style="color:#6a8aa8;border:1px solid #1e3a5a;background:transparent">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- Change Role Modal -->
+<div class="modal-overlay" id="roleModal">
+    <div class="modal">
+        <h4>تغيير الدور</h4>
+        <p style="color:#6a8aa8;font-size:0.85rem;margin-bottom:16px">
+            المستخدم: <strong id="roleUsername" style="color:#e2e8f0"></strong>
+        </p>
+        <div class="form-group">
+            <label>الدور الجديد</label>
+            <select id="newRole">
+                <option value="analyst">محلل أمني (Analyst)</option>
+                <option value="viewer">مشاهد فقط (Viewer)</option>
+                <option value="admin">مشرف (Admin)</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-success" onclick="submitRole()">حفظ</button>
+            <button class="btn" onclick="closeModal('roleModal')"
+                    style="color:#6a8aa8;border:1px solid #1e3a5a;background:transparent">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- Permissions Modal -->
+<div class="modal-overlay" id="permsModal">
+    <div class="modal">
+        <h4>تعديل الصلاحيات</h4>
+        <p style="color:#6a8aa8;font-size:0.85rem;margin-bottom:16px">
+            المستخدم: <strong id="permsUsername" style="color:#e2e8f0"></strong>
+        </p>
+        <div class="form-group">
+            <label style="margin-bottom:10px;display:block">اختر الصلاحيات:</label>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="perm_run_scan" value="run_scan" style="width:16px;height:16px;accent-color:#00f5ff;">
+                    <span><code style="color:#00f5ff">run_scan</code> — تشغيل فحوصات جديدة</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="perm_view_reports" value="view_reports" style="width:16px;height:16px;accent-color:#00f5ff;">
+                    <span><code style="color:#00f5ff">view_reports</code> — عرض تقارير الفحوصات</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="perm_delete_reports" value="delete_reports" style="width:16px;height:16px;accent-color:#ff8c00;">
+                    <span><code style="color:#ff8c00">delete_reports</code> — حذف التقارير</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="perm_manage_users" value="manage_users" style="width:16px;height:16px;accent-color:#ff6644;">
+                    <span><code style="color:#ff6644">manage_users</code> — إدارة المستخدمين (صلاحية المشرف)</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="perm_view_audit" value="view_audit" style="width:16px;height:16px;accent-color:#f5c518;">
+                    <span><code style="color:#f5c518">view_audit</code> — عرض سجل التدقيق</span>
+                </label>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn" style="background:linear-gradient(135deg,#7c6af5,#5a3fd4);color:#fff;" onclick="submitPerms()">حفظ الصلاحيات</button>
+            <button class="btn" onclick="closeModal('permsModal')"
+                    style="color:#6a8aa8;border:1px solid #1e3a5a;background:transparent">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentUserId = null;
+
+function openResetModal(userId, username) {
+    currentUserId = userId;
+    document.getElementById('resetUsername').textContent = username;
+    document.getElementById('newPassword').value = '';
+    document.getElementById('resetModal').classList.add('open');
+}
+
+function openRoleModal(userId, username, currentRole) {
+    currentUserId = userId;
+    document.getElementById('roleUsername').textContent = username;
+    document.getElementById('newRole').value = currentRole;
+    document.getElementById('roleModal').classList.add('open');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    currentUserId = null;
+}
+
+async function apiUpdate(uid, payload) {
+    const csrf = document.querySelector('meta[name="csrf-token"]') ?
+        document.querySelector('meta[name="csrf-token"]').content :
+        '{{ csrf_token() }}';
+    const res = await fetch(`/admin/users/${uid}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify(payload)
+    });
+    return res.json();
+}
+
+async function submitReset() {
+    const pw = document.getElementById('newPassword').value;
+    if (pw.length < 8) { alert('كلمة المرور يجب أن تكون 8 أحرف على الأقل.'); return; }
+    const data = await apiUpdate(currentUserId, { new_password: pw });
+    alert(data.message || (data.ok ? 'تم التحديث.' : 'فشل.'));
+    if (data.ok) { closeModal('resetModal'); location.reload(); }
+}
+
+async function submitRole() {
+    const role = document.getElementById('newRole').value;
+    const data = await apiUpdate(currentUserId, { role });
+    alert(data.message || (data.ok ? 'تم التحديث.' : 'فشل.'));
+    if (data.ok) location.reload();
+}
+
+async function toggleUser(userId, btn) {
+    const isActive = btn.textContent.trim() === 'إيقاف';
+    const data = await apiUpdate(userId, { is_active: !isActive });
+    if (data.ok) location.reload();
+    else alert(data.error || data.message);
+}
+
+function openPermsModal(userId, username, currentPerms) {
+    currentUserId = userId;
+    document.getElementById('permsUsername').textContent = username;
+    // إعادة تعيين جميع الخانات
+    ['run_scan','view_reports','delete_reports','manage_users','view_audit'].forEach(p => {
+        const el = document.getElementById('perm_' + p);
+        if (el) el.checked = currentPerms.includes(p);
+    });
+    document.getElementById('permsModal').classList.add('open');
+}
+
+async function submitPerms() {
+    const perms = ['run_scan','view_reports','delete_reports','manage_users','view_audit']
+        .filter(p => document.getElementById('perm_' + p) && document.getElementById('perm_' + p).checked);
+    const data = await apiUpdate(currentUserId, { permissions: perms });
+    alert(data.message || (data.ok ? 'تم التحديث.' : 'فشل.'));
+    if (data.ok) location.reload();
+}
+
+// إغلاق بالنقر خارج Modal
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('open');
+    });
+});
+</script>
+
+</body>
+</html>

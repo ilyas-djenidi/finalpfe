@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>CyBrain — منصة التقييم الأمني</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+    /* ═══════════════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════════════ */
+    :root {
+        --bg:          #05070f;
+        --bg-surface:  #0b1120;
+        --bg-card:     #0e1628;
+        --bg-input:    #080f1c;
+        --border:      rgba(99,179,237,0.12);
+        --border-focus:rgba(99,179,237,0.5);
+
+        --accent:      #4fa3e0;
+        --accent-glow: rgba(79,163,224,0.25);
+        --accent-dim:  rgba(79,163,224,0.08);
+        --green:       #34d399;
+        --green-dim:   rgba(52,211,153,0.08);
+        --amber:       #f59e0b;
+        --amber-dim:   rgba(245,158,11,0.08);
+        --red:         #f87171;
+        --red-dim:     rgba(248,113,113,0.08);
+        --purple:      #a78bfa;
+        --purple-dim:  rgba(167,139,250,0.08);
+
+        --text:        #e2eaf4;
+        --text-muted:  #5a7a9a;
+        --text-dim:    #3a5570;
+
+        --font-ui:     'Inter', 'Cairo', sans-serif;
+        --font-mono:   'Share Tech Mono', monospace;
+
+        --r:           8px;
+        --r-lg:        14px;
+        --t:           all 0.22s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* ═══════════════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; }
+    body {
+        font-family: var(--font-ui);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        direction: rtl;
+        overflow-x: hidden;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       ANIMATED BACKGROUND
+    ═══════════════════════════════════════════════════ */
+    .bg-grid {
+        position: fixed; inset: 0; z-index: 0; pointer-events: none;
+        background-image:
+            linear-gradient(rgba(79,163,224,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(79,163,224,0.03) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+    }
+    .bg-glow {
+        position: fixed; top: -30vh; left: 50%; transform: translateX(-50%);
+        width: 80vw; height: 60vh; pointer-events: none; z-index: 0;
+        background: radial-gradient(ellipse, rgba(79,163,224,0.06) 0%, transparent 70%);
+    }
+
+    /* ═══════════════════════════════════════════════════
+       LAYOUT
+    ═══════════════════════════════════════════════════ */
+    .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ═══════════════════════════════════════════════════
+       TOPBAR
+    ═══════════════════════════════════════════════════ */
+    .topbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 28px; height: 56px;
+        background: rgba(5,7,15,0.9);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(12px);
+        position: sticky; top: 0; z-index: 100;
+    }
+    .topbar-brand {
+        display: flex; align-items: center; gap: 10px;
+        font-family: var(--font-mono); font-size: 1rem; color: var(--accent);
+        text-decoration: none;
+    }
+    .topbar-brand svg { width: 26px; height: 26px; }
+    .brand-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    .user-chip {
+        display: flex; align-items: center; gap: 6px; padding: 4px 12px;
+        background: var(--accent-dim); border: 1px solid var(--border);
+        border-radius: 20px; font-size: 0.78rem; color: var(--text-muted);
+    }
+    .user-chip strong { color: var(--accent); font-weight: 600; }
+    .topbar-btn {
+        padding: 5px 14px; border-radius: 6px; font-size: 0.78rem; font-weight: 600;
+        text-decoration: none; border: 1px solid var(--border); cursor: pointer;
+        transition: var(--t); color: var(--text-muted); background: transparent;
+    }
+    .topbar-btn:hover { border-color: var(--border-focus); color: var(--text); }
+    .topbar-btn.admin { color: var(--amber); border-color: rgba(245,158,11,.3); background: var(--amber-dim); }
+    .topbar-btn.admin:hover { background: rgba(245,158,11,.15); }
+    .topbar-btn.dash { color: var(--purple); border-color: rgba(167,139,250,.3); background: var(--purple-dim); }
+
+    /* ═══════════════════════════════════════════════════
+       MAIN
+    ═══════════════════════════════════════════════════ */
+    .main { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 36px 20px 60px; }
+    .console { width: 100%; max-width: 820px; }
+
+    /* ═══════════════════════════════════════════════════
+       HEADER
+    ═══════════════════════════════════════════════════ */
+    .console-header { margin-bottom: 28px; }
+    .console-label {
+        font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim);
+        letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .console-label::before { content:''; flex:1; height:1px; background: linear-gradient(90deg, var(--border), transparent); }
+    .console-title { font-size: 1.9rem; font-weight: 700; letter-spacing: -.5px; line-height: 1.2; }
+    .console-title span { color: var(--accent); }
+    .console-sub { color: var(--text-muted); font-size: 0.88rem; margin-top: 6px; }
+
+    /* Stats strip */
+    .stats-strip { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+    .stat { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-dim); }
+    .stat-val { font-family: var(--font-mono); color: var(--accent); font-size: 0.9rem; font-weight: 600; }
+
+    /* Flash */
+    .flash-zone { margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .flash-item {
+        padding: 10px 14px; border-radius: var(--r); font-size: 0.85rem;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .flash-item.success { background: var(--green-dim); border: 1px solid rgba(52,211,153,.3); color: var(--green); }
+    .flash-item.error   { background: var(--red-dim);   border: 1px solid rgba(248,113,113,.3);color: var(--red); }
+    .flash-item.warning { background: var(--amber-dim); border: 1px solid rgba(245,158,11,.3); color: var(--amber); }
+
+    /* ═══════════════════════════════════════════════════
+       CARD
+    ═══════════════════════════════════════════════════ */
+    .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        padding: 28px;
+        position: relative;
+        overflow: hidden;
+    }
+    .card::before {
+        content:''; position:absolute; top:0; left:0; right:0; height:1px;
+        background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        opacity: .4;
+    }
+
+    /* Step header */
+    .step-label {
+        display: flex; align-items: center; gap: 10px;
+        font-family: var(--font-mono); font-size: 0.7rem;
+        color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase;
+        margin-bottom: 16px;
+    }
+    .step-num {
+        width: 20px; height: 20px; border-radius: 50%;
+        background: var(--accent-dim); border: 1px solid var(--border-focus);
+        color: var(--accent); font-size: 0.65rem; font-weight: 700;
+        display: grid; place-items: center; flex-shrink: 0;
+    }
+
+    /* Section divider */
+    .section-gap { height: 16px; }
+
+    /* ═══════════════════════════════════════════════════
+       SCAN TYPE GRID
+    ═══════════════════════════════════════════════════ */
+    .scan-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+    }
+    @media(max-width:680px){ .scan-grid{ grid-template-columns: repeat(2,1fr); } }
+
+    .scan-grid input[type=radio] { position:absolute; opacity:0; width:0; height:0; }
+
+    .scan-card {
+        position: relative; cursor: pointer;
+        background: var(--bg-surface); border: 1.5px solid var(--border);
+        border-radius: var(--r); padding: 14px 12px;
+        transition: var(--t); user-select: none;
+        display: flex; flex-direction: column; gap: 6px;
+    }
+    .scan-card:hover { border-color: var(--border-focus); background: var(--accent-dim); }
+    .scan-grid input:checked + .scan-card {
+        border-color: var(--accent);
+        background: var(--accent-dim);
+        box-shadow: 0 0 0 1px var(--accent), inset 0 0 16px var(--accent-glow);
+    }
+    .scan-card-icon { font-size: 1.4rem; line-height: 1; }
+    .scan-card-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+    .scan-card-desc { font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono); }
+    .scan-card-check {
+        position: absolute; top: 8px; left: 8px;
+        width: 16px; height: 16px; border-radius: 50%;
+        background: var(--accent); display: none;
+        align-items: center; justify-content: center;
+        font-size: 0.6rem; color: var(--bg);
+    }
+    .scan-grid input:checked + .scan-card .scan-card-check { display: flex; }
+
+    /* Upload badge on card */
+    .upload-badge {
+        position: absolute; top: 6px; right: 6px;
+        font-size: 0.6rem; padding: 2px 5px; border-radius: 3px;
+        background: rgba(167,139,250,.15); border: 1px solid rgba(167,139,250,.3);
+        color: var(--purple); font-family: var(--font-mono); letter-spacing: 1px;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       TARGET INPUT
+    ═══════════════════════════════════════════════════ */
+    .target-section { overflow: hidden; transition: max-height .35s cubic-bezier(.4,0,.2,1), opacity .25s ease, margin .3s ease; }
+    .target-section.collapsed { max-height: 0 !important; opacity: 0; margin: 0 !important; pointer-events: none; }
+
+    .input-wrap { position: relative; }
+    .input-prefix {
+        position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+        font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim);
+        pointer-events: none;
+    }
+    .target-input {
+        width: 100%; background: var(--bg-input); color: var(--text);
+        border: 1.5px solid var(--border); border-radius: var(--r);
+        padding: 13px 96px 13px 16px;
+        font-family: var(--font-mono); font-size: 0.92rem; outline: none;
+        transition: var(--t); direction: ltr;
+    }
+    .target-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .target-input::placeholder { color: var(--text-dim); }
+    .input-hint { font-size: 0.73rem; color: var(--text-dim); margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+    .input-hint-icon { color: var(--accent); }
+
+    /* ═══════════════════════════════════════════════════
+       FILE UPLOAD ZONE
+    ═══════════════════════════════════════════════════ */
+    .upload-section { overflow: hidden; transition: max-height .35s cubic-bezier(.4,0,.2,1), opacity .25s ease, margin .3s ease; }
+    .upload-section.collapsed { max-height: 0 !important; opacity: 0; margin: 0 !important; pointer-events: none; }
+
+    .drop-zone {
+        border: 2px dashed rgba(167,139,250,.35);
+        border-radius: var(--r); padding: 28px 20px;
+        text-align: center; cursor: pointer;
+        transition: var(--t); position: relative;
+        background: var(--purple-dim);
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+        border-color: var(--purple); background: rgba(167,139,250,.12);
+    }
+    .drop-zone input[type=file] {
+        position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-icon { font-size: 2rem; margin-bottom: 8px; opacity: .6; }
+    .drop-title { font-size: 0.88rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .drop-sub { font-size: 0.73rem; color: var(--text-dim); }
+    .drop-limit { font-size: 0.68rem; color: var(--text-dim); margin-top: 6px; font-family: var(--font-mono); }
+
+    .file-preview {
+        display: none; align-items: center; gap: 12px;
+        background: var(--bg-surface); border: 1px solid var(--border);
+        border-radius: var(--r); padding: 12px 16px; margin-top: 10px;
+    }
+    .file-preview.visible { display: flex; }
+    .file-icon { font-size: 1.4rem; }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-size: 0.82rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; }
+    .file-size { font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono); }
+    .file-remove {
+        width: 26px; height: 26px; border-radius: 50%; background: var(--red-dim);
+        border: 1px solid rgba(248,113,113,.3); color: var(--red); font-size: 0.8rem;
+        display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+        transition: var(--t);
+    }
+    .file-remove:hover { background: rgba(248,113,113,.2); }
+
+    .upload-error { color: var(--red); font-size: 0.75rem; margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+
+    /* ═══════════════════════════════════════════════════
+       CRITICALITY
+    ═══════════════════════════════════════════════════ */
+    .crit-row { display: flex; gap: 10px; }
+    .crit-option input[type=radio] { position:absolute; opacity:0; width:0; height:0; }
+    .crit-option { flex: 1; }
+    .crit-card {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 14px; border-radius: var(--r); cursor: pointer;
+        border: 1.5px solid var(--border); background: var(--bg-surface);
+        transition: var(--t);
+    }
+    .crit-card:hover { border-color: var(--border-focus); }
+    .crit-option input:checked + .crit-card.c-prod { border-color: var(--red); background: var(--red-dim); }
+    .crit-option input:checked + .crit-card.c-int  { border-color: var(--amber); background: var(--amber-dim); }
+    .crit-option input:checked + .crit-card.c-test { border-color: var(--green); background: var(--green-dim); }
+    .crit-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .c-prod .crit-dot { background: var(--red); }
+    .c-int  .crit-dot { background: var(--amber); }
+    .c-test .crit-dot { background: var(--green); }
+    .crit-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+    .crit-weight { font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono); }
+
+    /* ═══════════════════════════════════════════════════
+       ADVANCED OPTIONS
+    ═══════════════════════════════════════════════════ */
+    .adv-toggle {
+        display: flex; align-items: center; gap: 8px; cursor: pointer;
+        font-size: 0.8rem; color: var(--text-muted); padding: 8px 0;
+        border-top: 1px solid var(--border); margin-top: 4px; user-select: none;
+        transition: color .2s;
+    }
+    .adv-toggle:hover { color: var(--text); }
+    .adv-arrow { font-size: 0.65rem; transition: transform .25s; color: var(--accent); }
+    .adv-arrow.open { transform: rotate(90deg); }
+    .adv-panel { overflow: hidden; transition: max-height .3s cubic-bezier(.4,0,.2,1), opacity .25s ease; max-height: 0; opacity: 0; }
+    .adv-panel.open { max-height: 300px; opacity: 1; }
+    .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding-top: 12px; }
+    @media(max-width:500px){ .adv-grid{ grid-template-columns:1fr; } }
+
+    .toggle-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 9px 12px; border-radius: var(--r); cursor: pointer;
+        transition: background .15s;
+    }
+    .toggle-row:hover { background: var(--accent-dim); }
+    .toggle-label { font-size: 0.82rem; color: var(--text-muted); }
+    .toggle-sw { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
+    .toggle-sw input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+        position: absolute; inset: 0; border-radius: 9px;
+        background: var(--bg-input); border: 1px solid var(--border);
+        transition: var(--t);
+    }
+    .toggle-thumb {
+        position: absolute; top: 2px; right: 2px;
+        width: 14px; height: 14px; border-radius: 50%;
+        background: var(--text-dim); transition: var(--t);
+    }
+    .toggle-sw input:checked ~ .toggle-track { background: var(--accent); border-color: var(--accent); }
+    .toggle-sw input:checked ~ .toggle-thumb { right: calc(100% - 16px); background: #fff; }
+
+    /* ═══════════════════════════════════════════════════
+       LEGAL
+    ═══════════════════════════════════════════════════ */
+    .legal-box {
+        display: flex; align-items: flex-start; gap: 12px; cursor: pointer;
+        padding: 14px; border-radius: var(--r); border: 1.5px solid rgba(245,158,11,.2);
+        background: var(--amber-dim); overflow: hidden;
+        transition: max-height .35s cubic-bezier(.4,0,.2,1), opacity .25s ease, margin .3s ease;
+    }
+    .legal-box.collapsed { max-height: 0 !important; opacity: 0; margin: 0 !important; pointer-events: none; padding: 0; border: none; }
+    .legal-box input[type=checkbox] { margin-top: 2px; accent-color: var(--amber); flex-shrink: 0; width: 15px; height: 15px; cursor: pointer; }
+    .legal-text { font-size: 0.8rem; color: rgba(245,158,11,.9); line-height: 1.5; }
+    .legal-text small { display: block; font-size: 0.7rem; color: var(--text-dim); margin-top: 3px; }
+
+    /* ═══════════════════════════════════════════════════
+       SUBMIT
+    ═══════════════════════════════════════════════════ */
+    .submit-row { display: flex; gap: 10px; margin-top: 6px; }
+    .btn-scan {
+        flex: 1; padding: 14px; border-radius: var(--r); border: none; cursor: pointer;
+        background: linear-gradient(135deg, var(--accent), #3a7bbd);
+        color: #fff; font-size: 0.92rem; font-weight: 700; letter-spacing: .5px;
+        position: relative; overflow: hidden; transition: var(--t);
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-scan:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+    .btn-scan:active:not(:disabled) { transform: translateY(0); }
+    .btn-scan:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-scan .scan-icon { font-size: 1rem; }
+    .btn-scan .loading-state { display: none; align-items: center; gap: 8px; }
+    .btn-scan.scanning .normal-state { display: none; }
+    .btn-scan.scanning .loading-state { display: flex; }
+    .spin { animation: spin .8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-reset {
+        padding: 14px 20px; border-radius: var(--r);
+        background: transparent; border: 1.5px solid var(--border); color: var(--text-muted);
+        font-size: 0.85rem; cursor: pointer; transition: var(--t);
+    }
+    .btn-reset:hover { border-color: var(--border-focus); color: var(--text); }
+
+    /* Security badge */
+    .sec-badge {
+        display: flex; align-items: center; gap: 6px; margin-top: 10px;
+        font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono);
+        justify-content: center;
+    }
+    .sec-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+
+    /* ═══════════════════════════════════════════════════
+       PROGRESS
+    ═══════════════════════════════════════════════════ */
+    .progress-card { margin-top: 16px; display: none; }
+    .progress-card.visible { display: block; }
+
+    .prog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .prog-title { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+    .prog-pct { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent); }
+
+    .prog-bar { height: 4px; background: var(--bg-input); border-radius: 2px; overflow: hidden; margin-bottom: 14px; }
+    .prog-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 2px; width: 0%; transition: width .4s ease; }
+
+    .prog-steps { display: flex; justify-content: space-between; }
+    .prog-step {
+        font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-dim);
+        letter-spacing: 1.5px; padding: 4px 10px; border-radius: 3px;
+        transition: var(--t);
+    }
+    .prog-step.active { color: var(--accent); background: var(--accent-dim); }
+    .prog-step.done { color: var(--green); }
+
+    /* ═══════════════════════════════════════════════════
+       RESULT
+    ═══════════════════════════════════════════════════ */
+    .result-card { margin-top: 16px; display: none; }
+    .result-card.visible { display: block; }
+
+    .result-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .risk-ring {
+        width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
+        display: grid; place-items: center; border: 3px solid var(--border);
+        transition: var(--t);
+    }
+    .risk-ring.critical { border-color: var(--red); box-shadow: 0 0 20px var(--red-dim); }
+    .risk-ring.high     { border-color: var(--amber); box-shadow: 0 0 20px var(--amber-dim); }
+    .risk-ring.medium   { border-color: #fb923c; }
+    .risk-ring.low      { border-color: var(--green); }
+    .risk-num { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 700; }
+    .risk-ring.critical .risk-num { color: var(--red); }
+    .risk-ring.high     .risk-num { color: var(--amber); }
+    .risk-ring.medium   .risk-num { color: #fb923c; }
+    .risk-ring.low      .risk-num { color: var(--green); }
+
+    .result-meta { flex: 1; }
+    .result-level { font-size: 1rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .result-stats { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+    .result-stat { font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono); }
+    .result-stat span { color: var(--text); font-weight: 600; }
+
+    .result-btns { display: flex; gap: 8px; margin-top: 14px; }
+    .btn-report {
+        padding: 9px 20px; border-radius: var(--r); font-size: 0.82rem; font-weight: 600;
+        text-decoration: none; border: none; cursor: pointer; transition: var(--t);
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-report.primary { background: var(--accent); color: #fff; }
+    .btn-report.primary:hover { background: #3a7bbd; }
+    .btn-report.ghost { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); }
+    .btn-report.ghost:hover { border-color: var(--border-focus); color: var(--text); }
+
+    /* ═══════════════════════════════════════════════════
+       TERMINAL LINE
+    ═══════════════════════════════════════════════════ */
+    .terminal {
+        font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim);
+        padding: 10px 0 0; display: flex; align-items: center; gap: 6px;
+    }
+    .term-prompt { color: var(--accent); }
+    .term-cursor {
+        display: inline-block; width: 7px; height: 12px;
+        background: var(--accent); animation: blink 1s step-end infinite;
+        vertical-align: middle; margin-right: 2px;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ═══════════════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════════════ */
+    .footer {
+        text-align: center; padding: 16px; font-size: 0.7rem; color: var(--text-dim);
+        font-family: var(--font-mono); border-top: 1px solid var(--border);
+        display: flex; justify-content: space-between; align-items: center;
+        padding-inline: 28px;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       FIELD LABEL
+    ═══════════════════════════════════════════════════ */
+    .field-label {
+        font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .field-label-req { color: var(--red); margin-right: 2px; }
+
+    </style>
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<div class="app">
+
+    <!-- ══ TOPBAR ══ -->
+    <header class="topbar">
+        <a href="/" class="topbar-brand">
+            <svg viewBox="0 0 26 26" fill="none">
+                <polygon points="13,1 25,7 25,19 13,25 1,19 1,7" stroke="#4fa3e0" stroke-width="1.2" fill="rgba(79,163,224,0.06)"/>
+                <circle cx="13" cy="13" r="3" fill="#4fa3e0" opacity=".9"/>
+            </svg>
+            CYBRAIN
+        </a>
+        <div class="topbar-right">
+            <div class="brand-dot"></div>
+            <div class="user-chip">
+                <span>USER:</span>
+                <strong>{{ current_user.username | upper }}</strong>
+                {% if current_user.is_admin %}<span style="color:var(--amber);font-size:.7rem">[ADMIN]</span>{% endif %}
+            </div>
+            {% if current_user.is_admin %}
+            <a href="/admin" class="topbar-btn admin">⚙ ADMIN</a>
+            {% endif %}
+            <a href="{{ url_for('dashboard') }}" class="topbar-btn dash">📊 DASHBOARD</a>
+            <a href="{{ url_for('logout') }}" class="topbar-btn">↩ LOGOUT</a>
+        </div>
+    </header>
+
+    <!-- ══ MAIN ══ -->
+    <main class="main">
+        <div class="console">
+
+            <!-- Header -->
+            <div class="console-header">
+                <div class="console-label">CYBRAIN // SCAN CONSOLE</div>
+                <h1 class="console-title">إنشاء <span>فحص أمني</span> جديد</h1>
+                <p class="console-sub">اختر نوع الفحص وحدّد الهدف لبدء التقييم الأمني الشامل</p>
+                <div class="stats-strip">
+                    <div class="stat"><span class="stat-val" id="statScans">0</span> فحص مكتمل</div>
+                    <div class="stat"><span class="stat-val" id="statThreats">0</span> تهديد مكتشف</div>
+                    <div class="stat"><span class="stat-val">8+</span> أداة متكاملة</div>
+                    <div class="stat"><span class="stat-val">6</span> نوع فحص</div>
+                </div>
+            </div>
+
+            <!-- Flash -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-zone">
+                {% for category, msg in messages %}
+                <div class="flash-item {{ category }}">
+                    {{ '✓' if category=='success' else ('⚠' if category=='warning' else '✗') }} {{ msg }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- Form card -->
+            <div class="card">
+
+                <form id="scanForm" method="POST" action="{{ url_for('start_scan') }}"
+                      enctype="multipart/form-data" autocomplete="off" novalidate>
+
+                    {{ form.hidden_tag() }}
+
+                    <!-- ① SCAN TYPE -->
+                    <div class="step-label">
+                        <div class="step-num">1</div>
+                        نوع الفحص
+                    </div>
+
+                    <div class="scan-grid" role="radiogroup" aria-label="نوع الفحص">
+
+                        <label>
+                            <input type="radio" name="scan_type" value="network_ext"
+                                   {{ 'checked' if (form.scan_type.data or 'network_ext')=='network_ext' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <div class="scan-card-icon">🌐</div>
+                                <div class="scan-card-name">شبكات خارجي</div>
+                                <div class="scan-card-desc">Nmap · NSE · CVE</div>
+                            </div>
+                        </label>
+
+                        <label>
+                            <input type="radio" name="scan_type" value="network_int"
+                                   {{ 'checked' if form.scan_type.data=='network_int' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <div class="scan-card-icon">🔌</div>
+                                <div class="scan-card-name">شبكات داخلي</div>
+                                <div class="scan-card-desc">LAN · Services · OS</div>
+                            </div>
+                        </label>
+
+                        <label>
+                            <input type="radio" name="scan_type" value="web"
+                                   {{ 'checked' if form.scan_type.data=='web' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <div class="scan-card-icon">⚡</div>
+                                <div class="scan-card-name">فحص ويب</div>
+                                <div class="scan-card-desc">Headers · SSL · crt.sh</div>
+                            </div>
+                        </label>
+
+                        <label>
+                            <input type="radio" name="scan_type" value="server_ext"
+                                   {{ 'checked' if form.scan_type.data=='server_ext' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <div class="scan-card-icon">🖥</div>
+                                <div class="scan-card-name">سيرفر خارجي</div>
+                                <div class="scan-card-desc">Black-Box · Banners</div>
+                            </div>
+                        </label>
+
+                        <label>
+                            <input type="radio" name="scan_type" value="server_int"
+                                   {{ 'checked' if form.scan_type.data=='server_int' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <span class="upload-badge">UPLOAD</span>
+                                <div class="scan-card-icon">⚙</div>
+                                <div class="scan-card-name">سيرفر داخلي</div>
+                                <div class="scan-card-desc">.conf · httpd</div>
+                            </div>
+                        </label>
+
+                        <label>
+                            <input type="radio" name="scan_type" value="dependencies"
+                                   {{ 'checked' if form.scan_type.data=='dependencies' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <span class="upload-badge">UPLOAD</span>
+                                <div class="scan-card-icon">📦</div>
+                                <div class="scan-card-name">التبعيات</div>
+                                <div class="scan-card-desc">pip-audit · npm</div>
+                            </div>
+                        </label>
+
+                        <label>
+                            <input type="radio" name="scan_type" value="sast"
+                                   {{ 'checked' if form.scan_type.data=='sast' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <span class="upload-badge">ZIP</span>
+                                <div class="scan-card-icon">🔬</div>
+                                <div class="scan-card-name">SAST</div>
+                                <div class="scan-card-desc">Bandit · Semgrep · Gitleaks</div>
+                            </div>
+                        </label>
+
+                        <label>
+                            <input type="radio" name="scan_type" value="dast"
+                                   {{ 'checked' if form.scan_type.data=='dast' }}>
+                            <div class="scan-card" tabindex="0">
+                                <div class="scan-card-check">✓</div>
+                                <div class="scan-card-icon">🕷</div>
+                                <div class="scan-card-name">DAST</div>
+                                <div class="scan-card-desc">Nikto · ZAP · Nuclei</div>
+                            </div>
+                        </label>
+
+                    </div>
+
+                    <!-- ② TARGET -->
+                    <div class="section-gap" id="targetGap"></div>
+                    <div id="targetSection" class="target-section" style="max-height:200px;">
+                        <div class="step-label">
+                            <div class="step-num">2</div>
+                            الهدف
+                            <span class="field-label-req">*</span>
+                        </div>
+                        <div class="input-wrap">
+                            <span class="input-prefix">TARGET://</span>
+                            <input type="text" id="target" name="target" class="target-input"
+                                   placeholder="example.com أو 192.168.1.1"
+                                   dir="ltr" autocomplete="off" aria-required="true"
+                                   value="{{ form.target.data or '' }}">
+                        </div>
+                        <div class="input-hint" id="targetHint">
+                            <span class="input-hint-icon">↑</span>
+                            <span id="targetHintText">أدخل النطاق أو عنوان IP المراد فحصه</span>
+                        </div>
+                    </div>
+
+                    <!-- ② FILE UPLOAD (hidden by default) -->
+                    <div id="uploadSection" class="upload-section collapsed" style="max-height:0;">
+                        <div class="step-label">
+                            <div class="step-num">2</div>
+                            <span id="uploadTitle">رفع الملف</span>
+                            <span class="field-label-req">*</span>
+                        </div>
+                        <div class="drop-zone" id="dropZone">
+                            <input type="file" id="uploadInput" name="config_file"
+                                   accept=".conf,.txt,.json,.toml,.zip">
+                            <div class="drop-icon" id="dropIcon">📂</div>
+                            <div class="drop-title" id="dropTitle">اسحب الملف هنا أو انقر للاختيار</div>
+                            <div class="drop-sub" id="dropSub">الامتدادات المسموحة: .conf, .txt</div>
+                            <div class="drop-limit">الحجم الأقصى: 10 MB</div>
+                        </div>
+                        <div class="file-preview" id="filePreview">
+                            <div class="file-icon" id="filePreviewIcon">📄</div>
+                            <div class="file-info">
+                                <div class="file-name" id="fileName"></div>
+                                <div class="file-size" id="fileSize"></div>
+                            </div>
+                            <div class="file-remove" id="fileRemove" title="إزالة الملف">✕</div>
+                        </div>
+                        <div class="upload-error" id="uploadError" style="display:none">
+                            <span>✗</span><span id="uploadErrorText"></span>
+                        </div>
+                    </div>
+
+                    <!-- ③ CRITICALITY -->
+                    <div class="section-gap"></div>
+                    <div class="step-label">
+                        <div class="step-num" id="critStepNum">3</div>
+                        مستوى حساسية البيئة
+                    </div>
+                    <div class="crit-row" role="radiogroup">
+
+                        <div class="crit-option">
+                            <input type="radio" name="criticality" id="crit_prod" value="1"
+                                   {{ 'checked' if (form.criticality.data or '1')=='1' }}>
+                            <label class="crit-card c-prod" for="crit_prod">
+                                <div class="crit-dot"></div>
+                                <div>
+                                    <div class="crit-name">إنتاج حرج</div>
+                                    <div class="crit-weight">×1.0</div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="crit-option">
+                            <input type="radio" name="criticality" id="crit_int" value="0.6"
+                                   {{ 'checked' if form.criticality.data=='0.6' }}>
+                            <label class="crit-card c-int" for="crit_int">
+                                <div class="crit-dot"></div>
+                                <div>
+                                    <div class="crit-name">نظام داخلي</div>
+                                    <div class="crit-weight">×0.6</div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="crit-option">
+                            <input type="radio" name="criticality" id="crit_test" value="0.3"
+                                   {{ 'checked' if form.criticality.data=='0.3' }}>
+                            <label class="crit-card c-test" for="crit_test">
+                                <div class="crit-dot"></div>
+                                <div>
+                                    <div class="crit-name">بيئة اختبار</div>
+                                    <div class="crit-weight">×0.3</div>
+                                </div>
+                            </label>
+                        </div>
+
+                    </div>
+
+                    <!-- ④ ADVANCED -->
+                    <div class="adv-toggle" id="advToggle" tabindex="0" role="button" aria-expanded="false">
+                        <span class="adv-arrow" id="advArrow">▶</span>
+                        خيارات متقدمة
+                    </div>
+                    <div class="adv-panel" id="advPanel">
+                        <div class="adv-grid">
+
+                            <label class="toggle-row">
+                                <span class="toggle-label">فحص عميق</span>
+                                <div class="toggle-sw">
+                                    <input type="checkbox" name="deep_scan" id="deepScan" {{ 'checked' if form.deep_scan.data }}>
+                                    <div class="toggle-track"></div>
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </label>
+
+                            <label class="toggle-row">
+                                <span class="toggle-label">فحص CVE</span>
+                                <div class="toggle-sw">
+                                    <input type="checkbox" name="cve_check" id="cveCheck" {{ 'checked' if form.cve_check.data }}>
+                                    <div class="toggle-track"></div>
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </label>
+
+                            <label class="toggle-row">
+                                <span class="toggle-label">اكتشاف SSL/TLS</span>
+                                <div class="toggle-sw">
+                                    <input type="checkbox" name="ssl_check" id="sslCheck" {{ 'checked' if form.ssl_check.data }}>
+                                    <div class="toggle-track"></div>
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </label>
+
+                            <label class="toggle-row">
+                                <span class="toggle-label">تقرير PDF</span>
+                                <div class="toggle-sw">
+                                    <input type="checkbox" name="pdf_report" id="pdfReport" {{ 'checked' if form.pdf_report.data }}>
+                                    <div class="toggle-track"></div>
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </label>
+
+                        </div>
+                    </div>
+
+                    <!-- ⑤ LEGAL -->
+                    <div class="section-gap" id="legalGap" style="display:none;"></div>
+                    <label class="legal-box collapsed" id="legalBox" for="legal_disclaimer">
+                        <input type="checkbox" id="legal_disclaimer" name="legal_disclaimer" value="y">
+                        <div class="legal-text">
+                            أتحمّل المسؤولية القانونية الكاملة وأُقرّ بأنني مُخوَّل لفحص هذا الهدف
+                            <small>(مطلوب للفحوصات الخارجية — الشبكات والويب والسيرفر والـ DAST)</small>
+                        </div>
+                    </label>
+
+                    <!-- Alert -->
+                    <div id="alertBar" role="alert" style="display:none; margin-top:12px;"
+                         class="flash-item error"></div>
+
+                    <!-- ⑥ SUBMIT -->
+                    <div class="section-gap"></div>
+                    <div class="submit-row">
+                        <button type="submit" class="btn-scan" id="submitBtn">
+                            <span class="normal-state" style="display:flex;align-items:center;gap:8px;">
+                                <span class="scan-icon">🔍</span>
+                                <span>بدء الفحص الأمني</span>
+                            </span>
+                            <span class="loading-state">
+                                <span class="spin">◌</span>
+                                <span id="loadingText">جارٍ الفحص...</span>
+                            </span>
+                        </button>
+                        <button type="reset" class="btn-reset" id="resetBtn">↺ إعادة</button>
+                    </div>
+
+                    <div class="sec-badge">
+                        <div class="sec-dot"></div>
+                        CSRF PROTECTED · SESSION ENCRYPTED · AUDIT LOGGED
+                    </div>
+
+                    <div class="terminal">
+                        <span class="term-prompt">cybrain@sec:~$</span>
+                        <span id="termText">awaiting_input</span>
+                        <span class="term-cursor"></span>
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- Progress card -->
+            <div class="card progress-card" id="progressCard">
+                <div class="prog-header">
+                    <span class="prog-title">جارٍ الفحص الأمني...</span>
+                    <span class="prog-pct" id="progPct">0%</span>
+                </div>
+                <div class="prog-bar">
+                    <div class="prog-fill" id="progFill"></div>
+                </div>
+                <div class="prog-steps">
+                    <div class="prog-step" id="ps1">INIT</div>
+                    <div class="prog-step" id="ps2">RECON</div>
+                    <div class="prog-step" id="ps3">SCAN</div>
+                    <div class="prog-step" id="ps4">ANALYZE</div>
+                    <div class="prog-step" id="ps5">REPORT</div>
+                </div>
+            </div>
+
+            <!-- Result card -->
+            <div class="card result-card" id="resultCard"></div>
+
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <span>CYBRAIN SECURITY PLATFORM v1.0</span>
+        <span id="sysTime" style="color:var(--text-dim)"></span>
+    </footer>
+
+</div>
+
+<script src="/static/js/config.js" defer></script>
+<script src="/static/js/utils.js" defer></script>
+<script src="/static/js/particles.js" defer></script>
+<script defer>
+/* ═══════════════════════════════════════════════════
+   SMART FORM CONTROLLER
+═══════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+
+    /* ── clock ── */
+    const updateClock = () => {
+        const el = document.getElementById('sysTime');
+        if (el) el.textContent = new Date().toUTCString().slice(0, -4) + ' UTC';
+    };
+    updateClock(); setInterval(updateClock, 1000);
+
+    /* ── stats ── */
+    fetch('/api/stats').then(r => r.ok ? r.json() : {}).catch(() => ({})).then(d => {
+        const animCount = (el, v) => {
+            if (!el || !v) return;
+            let n = 0, step = Math.ceil(v / 40);
+            const t = setInterval(() => { n = Math.min(n + step, v); el.textContent = n; if (n >= v) clearInterval(t); }, 40);
+        };
+        setTimeout(() => {
+            animCount(document.getElementById('statScans'),   d.total_scans  || 0);
+            animCount(document.getElementById('statThreats'), d.total_vulns  || 0);
+        }, 600);
+    });
+
+    /* ── scan type config ── */
+    const UPLOAD_TYPES = {
+        server_int:   { title: 'ملف إعدادات الخادم',  sub: 'httpd.conf أو nginx.conf', accept: '.conf,.txt',       icon: '⚙', name: 'config_file' },
+        dependencies: { title: 'ملف التبعيات',         sub: 'requirements.txt أو package.json', accept: '.txt,.json,.toml', icon: '📦', name: 'config_file' },
+        sast:         { title: 'كود المصدر مضغوط',     sub: 'مجلد الكود كملف .zip', accept: '.zip',               icon: '🔬', name: 'config_file' },
+    };
+    const EXTERNAL = new Set(['network_ext', 'web', 'server_ext', 'dast']);
+    const PLACEHOLDERS = {
+        network_ext:  '192.168.1.1 أو example.com',
+        network_int:  '192.168.1.0/24 أو 10.0.0.1',
+        web:          'https://example.com',
+        server_ext:   'example.com أو 192.168.1.1',
+        dast:         'https://example.com',
+    };
+
+    /* ── elements ── */
+    const targetSection  = document.getElementById('targetSection');
+    const uploadSection  = document.getElementById('uploadSection');
+    const targetInput    = document.getElementById('target');
+    const targetHintText = document.getElementById('targetHintText');
+    const uploadTitle    = document.getElementById('uploadTitle');
+    const dropTitle      = document.getElementById('dropTitle');
+    const dropSub        = document.getElementById('dropSub');
+    const dropIcon       = document.getElementById('dropIcon');
+    const uploadInput    = document.getElementById('uploadInput');
+    const legalBox       = document.getElementById('legalBox');
+    const legalGap       = document.getElementById('legalGap');
+    const termText       = document.getElementById('termText');
+
+    /* ── form update on scan type change ── */
+    function updateForm() {
+        const checked = document.querySelector('input[name="scan_type"]:checked');
+        const val = checked ? checked.value : 'network_ext';
+        const cfg = UPLOAD_TYPES[val];
+        const needUpload  = !!cfg;
+        const needTarget  = !needUpload;
+        const needLegal   = EXTERNAL.has(val);
+
+        /* target visibility */
+        if (needTarget) {
+            targetSection.classList.remove('collapsed');
+            targetSection.style.maxHeight = '200px';
+            targetInput.required = true;
+            if (targetInput.value === '_local_') targetInput.value = '';
+            if (PLACEHOLDERS[val]) targetInput.placeholder = PLACEHOLDERS[val];
+            targetHintText.textContent = val === 'network_int'
+                ? 'أدخل نطاق الشبكة (CIDR) أو عنوان IP الداخلي'
+                : val === 'web' || val === 'dast'
+                ? 'أدخل رابط الموقع كاملاً بما في ذلك https://'
+                : 'أدخل النطاق أو عنوان IP المراد فحصه';
+        } else {
+            targetSection.classList.add('collapsed');
+            targetSection.style.maxHeight = '0';
+            targetInput.required = false;
+            targetInput.value = '_local_';
+        }
+
+        /* upload visibility */
+        if (needUpload) {
+            uploadSection.classList.remove('collapsed');
+            uploadSection.style.maxHeight = '320px';
+            uploadTitle.textContent = cfg.title;
+            dropTitle.textContent   = 'اسحب الملف هنا أو انقر للاختيار';
+            dropSub.textContent     = 'الامتدادات المسموحة: ' + cfg.accept;
+            dropIcon.textContent    = cfg.icon;
+            uploadInput.accept      = cfg.accept;
+            uploadInput.name        = cfg.name;
+        } else {
+            uploadSection.classList.add('collapsed');
+            uploadSection.style.maxHeight = '0';
+            uploadInput.value = '';
+            clearFilePreview();
+        }
+
+        /* legal */
+        if (needLegal) {
+            legalBox.classList.remove('collapsed');
+            legalBox.style.maxHeight = '120px';
+            if (legalGap) { legalGap.style.display = 'block'; legalGap.style.height = '16px'; }
+        } else {
+            legalBox.classList.add('collapsed');
+            legalBox.style.maxHeight = '0';
+            if (legalGap) legalGap.style.display = 'none';
+            const legalCb = document.getElementById('legal_disclaimer');
+            if (legalCb) legalCb.checked = false;
+        }
+
+        /* terminal */
+        if (termText) termText.textContent = `scan_type=${val} | configuring...`;
+
+        /* auto-focus: go to the right input */
+        requestAnimationFrame(() => {
+            if (needUpload) {
+                document.getElementById('dropZone')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else if (needTarget) {
+                setTimeout(() => targetInput?.focus(), 180);
+            }
+        });
+    }
+
+    document.querySelectorAll('input[name="scan_type"]').forEach(r => {
+        r.addEventListener('change', updateForm);
+    });
+    updateForm(); /* initial state */
+
+    /* ── keyboard nav for scan cards ── */
+    document.querySelectorAll('.scan-card[tabindex]').forEach(card => {
+        card.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                card.previousElementSibling?.click();
+            }
+        });
+    });
+
+    /* ── drag-and-drop ── */
+    const dropZone = document.getElementById('dropZone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const file = e.dataTransfer?.files[0];
+            if (file) handleFile(file);
+        });
+        uploadInput?.addEventListener('change', e => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+    }
+
+    const MAX_BYTES = 10 * 1024 * 1024;
+    const BLOCKED_EXT = new Set(['.exe','.bat','.cmd','.sh','.ps1','.dll','.so','.bin','.msi','.com']);
+
+    function handleFile(file) {
+        const errEl   = document.getElementById('uploadError');
+        const errText = document.getElementById('uploadErrorText');
+        const name    = file.name.toLowerCase();
+        const ext     = name.slice(name.lastIndexOf('.'));
+
+        if (BLOCKED_EXT.has(ext)) {
+            showUploadError(`الملف "${ext}" محظور لأسباب أمنية`); return;
+        }
+        if (file.size > MAX_BYTES) {
+            showUploadError(`حجم الملف (${fmtSize(file.size)}) يتجاوز الحد المسموح 10 MB`); return;
+        }
+        if (errEl) errEl.style.display = 'none';
+        showFilePreview(file);
+    }
+
+    function showUploadError(msg) {
+        const errEl   = document.getElementById('uploadError');
+        const errText = document.getElementById('uploadErrorText');
+        if (errEl)   errEl.style.display = 'flex';
+        if (errText) errText.textContent  = msg;
+        clearFilePreview();
+        uploadInput.value = '';
+    }
+
+    function showFilePreview(file) {
+        const preview = document.getElementById('filePreview');
+        const nameEl  = document.getElementById('fileName');
+        const sizeEl  = document.getElementById('fileSize');
+        if (!preview) return;
+        preview.classList.add('visible');
+        if (nameEl) nameEl.textContent = file.name;
+        if (sizeEl) sizeEl.textContent = fmtSize(file.size);
+    }
+
+    function clearFilePreview() {
+        const preview = document.getElementById('filePreview');
+        if (preview) preview.classList.remove('visible');
+    }
+
+    document.getElementById('fileRemove')?.addEventListener('click', e => {
+        e.preventDefault();
+        uploadInput.value = '';
+        clearFilePreview();
+        const errEl = document.getElementById('uploadError');
+        if (errEl) errEl.style.display = 'none';
+    });
+
+    function fmtSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    /* ── advanced toggle ── */
+    const advToggle = document.getElementById('advToggle');
+    const advPanel  = document.getElementById('advPanel');
+    const advArrow  = document.getElementById('advArrow');
+    if (advToggle) {
+        const toggle = () => {
+            const open = advPanel.classList.toggle('open');
+            advArrow.classList.toggle('open', open);
+            advToggle.setAttribute('aria-expanded', open);
+        };
+        advToggle.addEventListener('click', toggle);
+        advToggle.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } });
+    }
+
+    /* ── form submission ── */
+    const scanForm = document.getElementById('scanForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const progressCard = document.getElementById('progressCard');
+    const resultCard   = document.getElementById('resultCard');
+
+    const STEPS = [
+        { id: 'ps1', label: 'INIT',    pct: 5  },
+        { id: 'ps2', label: 'RECON',   pct: 20 },
+        { id: 'ps3', label: 'SCAN',    pct: 55 },
+        { id: 'ps4', label: 'ANALYZE', pct: 80 },
+        { id: 'ps5', label: 'REPORT',  pct: 95 },
+    ];
+
+    let progInterval = null;
+    let progStep = 0;
+
+    function startProgress() {
+        progressCard.classList.add('visible');
+        progressCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        progStep = 0;
+        STEPS.forEach(s => {
+            const el = document.getElementById(s.id);
+            if (el) { el.classList.remove('active','done'); }
+        });
+        const el0 = document.getElementById(STEPS[0].id);
+        if (el0) el0.classList.add('active');
+        setProgress(5);
+
+        let i = 1;
+        progInterval = setInterval(() => {
+            if (i >= STEPS.length) return;
+            const prev = document.getElementById(STEPS[i-1].id);
+            if (prev) { prev.classList.remove('active'); prev.classList.add('done'); }
+            const cur = document.getElementById(STEPS[i].id);
+            if (cur) cur.classList.add('active');
+            setProgress(STEPS[i].pct);
+            i++;
+        }, 4000);
+    }
+
+    function setProgress(pct) {
+        document.getElementById('progFill').style.width = pct + '%';
+        document.getElementById('progPct').textContent  = pct + '%';
+    }
+
+    function stopProgress(pct) {
+        clearInterval(progInterval);
+        setProgress(pct);
+        STEPS.forEach(s => {
+            const el = document.getElementById(s.id);
+            if (el) { el.classList.remove('active'); el.classList.add('done'); }
+        });
+    }
+
+    function showAlert(msg) {
+        const bar = document.getElementById('alertBar');
+        if (!bar) return;
+        bar.textContent = '✗  ' + msg;
+        bar.style.display = 'block';
+        bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    function hideAlert() {
+        const bar = document.getElementById('alertBar');
+        if (bar) bar.style.display = 'none';
+    }
+
+    if (scanForm) {
+        scanForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideAlert();
+
+            /* client-side legal check */
+            const legal = document.getElementById('legal_disclaimer');
+            const legalRequired = !legalBox.classList.contains('collapsed');
+            if (legalRequired && legal && !legal.checked) {
+                showAlert('يجب الموافقة على الإقرار القانوني للمتابعة.');
+                legal.focus();
+                return;
+            }
+
+            /* client-side upload check */
+            const needUpload = !uploadSection.classList.contains('collapsed');
+            if (needUpload && !uploadInput.files.length) {
+                showAlert('يجب رفع الملف المطلوب لهذا النوع من الفحص.');
+                document.getElementById('dropZone')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+
+            /* start */
+            submitBtn.classList.add('scanning');
+            submitBtn.disabled = true;
+            if (termText) termText.textContent = 'initializing_scan...';
+            startProgress();
+
+            try {
+                const fd = new FormData(scanForm);
+                const res = await fetch('/start-scan', { method: 'POST', body: fd });
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    stopProgress(0);
+                    progressCard.classList.remove('visible');
+                    showAlert(data.error || 'حدث خطأ غير متوقع.');
+                    if (termText) termText.textContent = 'scan_failed';
+                } else {
+                    stopProgress(100);
+                    if (termText) termText.textContent = `scan_complete | risk=${data.risk_level} | score=${data.risk_score}`;
+                    setTimeout(() => showResult(data), 500);
+                }
+            } catch (err) {
+                stopProgress(0);
+                progressCard.classList.remove('visible');
+                showAlert('تعذّر الاتصال بالخادم. تحقق من الشبكة.');
+                if (termText) termText.textContent = 'connection_error';
+            } finally {
+                submitBtn.classList.remove('scanning');
+                submitBtn.disabled = false;
+            }
+        });
+    }
+
+    function showResult(data) {
+        const level = (data.risk_level || 'low').toLowerCase();
+        const score = parseFloat(data.risk_score || 0).toFixed(1);
+        const vulnCount = (data.scan_result?.vulnerabilities || []).length;
+        const token = data.report_token || '';
+
+        const levelAr = { critical:'حرج', high:'عالٍ', medium:'متوسط', low:'منخفض', info:'معلوماتي' }[level] || level;
+
+        resultCard.innerHTML = `
+            <div class="result-row">
+                <div class="risk-ring ${level}">
+                    <div class="risk-num">${score}</div>
+                </div>
+                <div class="result-meta">
+                    <div class="result-level" style="color:${level==='critical'?'var(--red)':level==='high'?'var(--amber)':level==='medium'?'#fb923c':'var(--green)'}">${levelAr.toUpperCase()}</div>
+                    <div class="result-stats">
+                        <div class="result-stat">ثغرات: <span>${vulnCount}</span></div>
+                        <div class="result-stat">موثوقية: <span>${((data.confidence||0)*100).toFixed(0)}%</span></div>
+                        ${data.scan_result?.meta?.tools_used ? `<div class="result-stat">أدوات: <span>${data.scan_result.meta.tools_used.join(' · ')}</span></div>` : ''}
+                    </div>
+                    ${data.recommendations?.length ? `<div style="margin-top:8px;font-size:.78rem;color:var(--text-muted)">${data.recommendations[0]}</div>` : ''}
+                </div>
+            </div>
+            ${token ? `
+            <div class="result-btns" style="margin-top:16px;">
+                <a href="/report/${token}" target="_blank" class="btn-report primary">📄 عرض التقرير الكامل</a>
+                <button class="btn-report ghost" onclick="document.getElementById('scanForm').reset();document.getElementById('resultCard').classList.remove('visible');document.getElementById('progressCard').classList.remove('visible');">
+                    + فحص جديد
+                </button>
+            </div>` : ''}
+        `;
+        resultCard.classList.add('visible');
+        resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /* ── reset ── */
+    document.getElementById('resetBtn')?.addEventListener('click', () => {
+        clearFilePreview();
+        if (uploadInput) uploadInput.value = '';
+        const errEl = document.getElementById('uploadError');
+        if (errEl) errEl.style.display = 'none';
+        hideAlert();
+        progressCard.classList.remove('visible');
+        resultCard.classList.remove('visible');
+        if (termText) termText.textContent = 'awaiting_input';
+        setTimeout(() => updateForm(), 100);
+    });
+
+    /* initial terminal text */
+    if (termText) termText.textContent = 'select_scan_type_to_begin';
+
+});
+</script>
+
+</body>
+</html>
