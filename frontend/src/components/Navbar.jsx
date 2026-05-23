@@ -28,19 +28,23 @@ const NavLink = ({ to, label, active }) => (
 const Navbar = () => {
     const { user, logout } = useAuth();
     const { pathname } = useLocation();
-    const [darkMode, setDarkMode] = useState(false);
+    const [darkMode, setDarkMode]         = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const [lang, setLang]                 = useState('en');
 
     useEffect(() => {
         if (localStorage.theme === 'light') {
             setDarkMode(false);
             document.documentElement.classList.remove('dark');
         } else {
-            // Default to dark mode if no preference or explicitly dark
             setDarkMode(true);
             document.documentElement.classList.add('dark');
         }
+        const savedLang = localStorage.getItem('cybrain_lang') || 'en';
+        setLang(savedLang);
+        document.dir = savedLang === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = savedLang;
     }, []);
 
     const toggleTheme = () => {
@@ -53,6 +57,14 @@ const Navbar = () => {
             document.documentElement.classList.remove('dark');
             localStorage.theme = 'light';
         }
+    };
+
+    const toggleLang = () => {
+        const newLang = lang === 'en' ? 'ar' : 'en';
+        setLang(newLang);
+        localStorage.setItem('cybrain_lang', newLang);
+        document.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = newLang;
     };
 
     if (!user) return null;
@@ -97,7 +109,14 @@ const Navbar = () => {
 
                     {/* Right: Actions */}
                     <div className="hidden md:flex items-center gap-4">
-                        <button 
+                        <button
+                            onClick={toggleLang}
+                            title={lang === 'en' ? 'Switch to Arabic' : 'Switch to English'}
+                            className="px-2 py-1 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                            {lang === 'en' ? 'AR' : 'EN'}
+                        </button>
+                        <button
                             onClick={toggleTheme}
                             className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
@@ -184,6 +203,9 @@ const Navbar = () => {
                             </div>
                         </div>
                         <div className="flex gap-2">
+                            <button onClick={toggleLang} className="px-2 py-1 text-xs font-semibold text-slate-500 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                {lang === 'en' ? 'AR' : 'EN'}
+                            </button>
                             <button onClick={toggleTheme} className="p-2 text-slate-500 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
                                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                             </button>

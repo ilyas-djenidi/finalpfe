@@ -275,7 +275,8 @@ def log_event(action: str, username: str = "", user_id: int | None = None,
 
 def get_audit_log(user_id: int | None = None, category: str | None = None,
                   action: str | None = None, limit: int = 200,
-                  date_from: str | None = None, date_to: str | None = None) -> list[dict]:
+                  date_from: str | None = None, date_to: str | None = None,
+                  page: int = 1, per_page: int | None = None) -> tuple[list[dict], int]:
     clauses, params = [], []
     if user_id   is not None: clauses.append("user_id=?");         params.append(user_id)
     if category:              clauses.append("category=?");         params.append(category)
@@ -283,11 +284,20 @@ def get_audit_log(user_id: int | None = None, category: str | None = None,
     if date_from:             clauses.append("created_at >= ?");    params.append(date_from)
     if date_to:               clauses.append("created_at <= ?");    params.append(date_to)
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-    params.append(limit)
-    rows = _get_db().execute(
-        f"SELECT * FROM audit_logs {where} ORDER BY created_at DESC LIMIT ?", params
-    ).fetchall()
-    return [dict(r) for r in rows]
+    db    = _get_db()
+    total = db.execute(f"SELECT COUNT(*) FROM audit_logs {where}", params).fetchone()[0]
+    if per_page:
+        offset = (max(page, 1) - 1) * per_page
+        rows = db.execute(
+            f"SELECT * FROM audit_logs {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [per_page, offset],
+        ).fetchall()
+    else:
+        rows = db.execute(
+            f"SELECT * FROM audit_logs {where} ORDER BY created_at DESC LIMIT ?",
+            params + [limit],
+        ).fetchall()
+    return [dict(r) for r in rows], total
 
 
 def get_audit_stats() -> dict:

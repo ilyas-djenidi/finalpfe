@@ -159,8 +159,10 @@ const ChatBot = ({ context = null, position = 'fixed', scanFindings = null }) =>
   const [ariaStatus,  setAriaStatus]  = useState(null);
   const [clearingHistory, setClearingHistory] = useState(false);
 
-  const bottomRef   = useRef(null);
-  const inputRef    = useRef(null);
+  const bottomRef          = useRef(null);
+  const inputRef           = useRef(null);
+  const sendMessageRef     = useRef(null);
+  const clearHistoryRef    = useRef(null);
 
   // Fetch ARIA status once on mount
   useEffect(() => {
@@ -219,6 +221,27 @@ const ChatBot = ({ context = null, position = 'fixed', scanFindings = null }) =>
       time: now(),
     }]);
     setClearingHistory(false);
+  }, []);
+
+  // Keep refs in sync so event handlers always call the latest version
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+
+  // aria-inject: topic cards in ChatPage dispatch this event
+  useEffect(() => {
+    const handler = (e) => {
+      if (position === 'fixed') setOpen(true);
+      setTimeout(() => sendMessageRef.current(e.detail), position === 'fixed' ? 200 : 0);
+    };
+    window.addEventListener('aria-inject', handler);
+    return () => window.removeEventListener('aria-inject', handler);
+  }, [position]);
+
+  // aria-clear-history: sidebar clear button in ChatPage dispatches this event
+  useEffect(() => { clearHistoryRef.current = handleClearHistory; }, [handleClearHistory]);
+  useEffect(() => {
+    const handler = () => clearHistoryRef.current();
+    window.addEventListener('aria-clear-history', handler);
+    return () => window.removeEventListener('aria-clear-history', handler);
   }, []);
 
   const handleAnalyzeScan = useCallback(() => {

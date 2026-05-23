@@ -880,7 +880,7 @@ def admin_audit():
     uid      = request.args.get("user_id", type=int)
     category = request.args.get("category")
     action   = request.args.get("action")
-    logs     = get_audit_log(user_id=uid, category=category, action=action, limit=200)
+    logs, _  = get_audit_log(user_id=uid, category=category, action=action, limit=200)
     stats    = get_audit_stats()
     return render_template(
         "audit_log.html",
@@ -1571,10 +1571,23 @@ def api_admin_audit():
     action    = request.args.get("action") or None
     date_from = request.args.get("date_from") or None
     date_to   = request.args.get("date_to") or None
-    logs      = get_audit_log(user_id=uid, category=category, action=action,
-                               date_from=date_from, date_to=date_to, limit=200)
-    stats     = get_audit_stats()
-    return jsonify({"logs": [dict(l) for l in logs], "stats": dict(stats)})
+    page     = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 50, type=int)
+    logs, total = get_audit_log(user_id=uid, category=category, action=action,
+                                date_from=date_from, date_to=date_to,
+                                page=page, per_page=per_page)
+    return jsonify({"logs": [dict(l) for l in logs], "total": total})
+
+
+@app.route("/api/admin/ai/clear-all", methods=["POST"])
+@admin_required
+@csrf.exempt
+def api_admin_ai_clear_all():
+    aria   = get_aria()
+    count  = aria.clear_all_histories()
+    log_event("ai_history_cleared", current_user.username, current_user.id,
+              "admin", details=f"Cleared {count} AI conversation sessions")
+    return jsonify({"message": f"Cleared {count} AI conversation session(s).", "count": count})
 
 
 # ── React Scan Bridges ────────────────────────────────────────────────────

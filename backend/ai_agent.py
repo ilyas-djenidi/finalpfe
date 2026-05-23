@@ -373,6 +373,12 @@ class ARIA:
         """Erase conversation history for a specific user."""
         self._chat_histories.pop(str(user_id), None)
 
+    def clear_all_histories(self) -> int:
+        """Erase all per-user conversation histories. Returns number of sessions cleared."""
+        count = len(self._chat_histories)
+        self._chat_histories.clear()
+        return count
+
     # ── Provider calls ────────────────────────────────────────────────────────
 
     def _gemini(self, prompt: str, system: str = "") -> Optional[str]:

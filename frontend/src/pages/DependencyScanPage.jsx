@@ -2,9 +2,9 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { 
-    Activity, ArrowLeft, PackageSearch, UploadCloud, 
-    FileText, X, AlertTriangle, ChevronRight, Download
+import {
+    Activity, ArrowLeft, PackageSearch, UploadCloud,
+    FileText, X, AlertTriangle, Terminal, ChevronRight, Download
 } from 'lucide-react';
 
 const SEVERITY_COLORS = {
@@ -21,6 +21,8 @@ const DependencyScanPage = () => {
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState(null);
     const [error, setError] = useState(null);
+    const [ariaAnalysis, setAriaAnalysis] = useState('');
+    const [analyzing, setAnalyzing] = useState(false);
     const fileInputRef = useRef(null);
 
     const handleDrag = (e) => {
@@ -76,6 +78,23 @@ const DependencyScanPage = () => {
             setError(`Error: ${e.response?.data?.error || e.message}`);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const analyzeWithAria = async () => {
+        if (!results?.findings?.length) return;
+        setAnalyzing(true);
+        setAriaAnalysis('');
+        try {
+            const { data } = await axios.post('/api/ai/analyze', {
+                findings: results.findings,
+                scan_type: 'dependencies',
+            }, { withCredentials: true });
+            setAriaAnalysis(data.analysis || data.response || 'No analysis returned.');
+        } catch (e) {
+            setAriaAnalysis('ARIA analysis unavailable: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setAnalyzing(false);
         }
     };
 
@@ -201,6 +220,32 @@ const DependencyScanPage = () => {
                                             <div className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase">{s.l}</div>
                                         </div>
                                     ))}
+                                </div>
+
+                                {/* ARIA Analysis Card */}
+                                <div className="bg-purple-50 dark:bg-purple-500/5 border border-purple-200 dark:border-purple-500/20 rounded-xl p-6 shadow-sm">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-purple-700 dark:text-purple-400 flex items-center gap-2">
+                                                <Terminal className="w-4 h-4" /> Analyze with ARIA
+                                            </h3>
+                                            <p className="text-xs text-purple-600/80 dark:text-purple-400/80 mt-1">AI-powered dependency vulnerability triage.</p>
+                                        </div>
+                                        <button
+                                            onClick={analyzeWithAria}
+                                            disabled={analyzing}
+                                            className="px-4 py-2 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-semibold hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            {analyzing ? 'Analyzing...' : 'Analyze with ARIA'}
+                                        </button>
+                                    </div>
+                                    {ariaAnalysis && (
+                                        <div className="bg-white dark:bg-slate-950 border border-purple-100 dark:border-purple-500/10 rounded-lg p-4">
+                                            <pre className="text-xs text-slate-700 dark:text-slate-300 font-mono leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                                                {ariaAnalysis}
+                                            </pre>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="space-y-3">

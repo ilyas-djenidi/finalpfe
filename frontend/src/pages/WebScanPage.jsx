@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { 
-    Activity, ArrowLeft, Globe, Shield, 
+import {
+    Activity, ArrowLeft, Globe, Shield,
     AlertTriangle, Terminal, ChevronRight, Download
 } from 'lucide-react';
-import { isPrivateIP, runLocalScan } from '../utils/localScanner';
+
+const PRIVATE_IP_RE = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|localhost$)/i;
+const isPrivateIP = (host) => PRIVATE_IP_RE.test(host);
 
 const SEVERITY_COLORS = {
     CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border-red-200 dark:border-red-500/20',
@@ -23,47 +25,44 @@ const WebScanPage = () => {
     const [results, setResults] = useState(null);
     const [error, setError] = useState(null);
     const [permissionGranted, setPermissionGranted] = useState(false);
-    const [scanProgress, setScanProgress] = useState(0);
-    const [isLocalScan, setIsLocalScan] = useState(false);
-    const [scanStatusText, setScanStatusText] = useState('');
+    const [ariaAnalysis, setAriaAnalysis] = useState('');
+    const [analyzing, setAnalyzing] = useState(false);
 
     const scanModes = [
-        { id: 'full', label: 'Deep Infiltration', desc: 'Comprehensive XSS, SQLi, and misconfiguration scan', icon: Shield },
-        { id: 'quick', label: 'Surface Audit', desc: 'Fast scan of common vulnerabilities', icon: Activity },
-        { id: 'stealth', label: 'Reconnaissance', desc: 'Low noise information gathering', icon: Globe }
+        { id: 'full',    label: 'Deep Infiltration', desc: 'Comprehensive XSS, SQLi, and misconfiguration scan', icon: Shield },
+        { id: 'quick',   label: 'Surface Audit',     desc: 'Fast scan of common vulnerabilities',              icon: Activity },
+        { id: 'stealth', label: 'Reconnaissance',    desc: 'Low noise information gathering',                  icon: Globe }
     ];
+
+    const domainOf = (raw) => raw.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
 
     const handleExecuteScan = async () => {
         if (!target.trim() || !permissionGranted) return;
         const scanTarget = target.trim();
+        const host = domainOf(scanTarget);
 
         setLoading(true);
         setResults(null);
         setError(null);
-        setScanProgress(0);
+        setAriaAnalysis('');
 
         try {
-            const domainOnly = scanTarget.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
-            const privateTarget = isPrivateIP(domainOnly);
-            setIsLocalScan(privateTarget);
-
-            if (privateTarget) {
-                const data = await runLocalScan(
-                    domainOnly,
-                    scanMode,
-                    (done, total, statusText) => {
-                        setScanProgress(done);
-                        if (statusText) setScanStatusText(statusText);
-                    }
+            if (isPrivateIP(host)) {
+                // Route internal targets to the backend network scanner
+                const { data } = await axios.post(
+                    '/scan_network',
+                    { target: host, mode: scanMode, scan_type: 'network_int' },
+                    { withCredentials: true, timeout: 480000 }
                 );
-                setResults(data);
+                if (data.findings?.length > 0) setResults(data);
+                else setError('No services discovered on internal target.');
             } else {
                 const { data } = await axios.post(
                     '/scan_url',
                     { url: scanTarget, mode: scanMode },
-                    { headers: { 'Content-Type': 'application/json' }, withCredentials: true, timeout: 480000 }
+                    { withCredentials: true, timeout: 480000 }
                 );
-                if (data.findings && data.findings.length > 0) setResults(data);
+                if (data.findings?.length > 0) setResults(data);
                 else setError('No vulnerabilities discovered on target.');
             }
         } catch (e) {
@@ -72,15 +71,32 @@ const WebScanPage = () => {
             else setError(`Error: ${e.response?.data?.error || e.message}`);
         } finally {
             setLoading(false);
-            setScanProgress(100);
+        }
+    };
+
+    const analyzeWithAria = async () => {
+        if (!results?.findings?.length) return;
+        setAnalyzing(true);
+        setAriaAnalysis('');
+        try {
+            const { data } = await axios.post('/api/ai/analyze', {
+                findings: results.findings,
+                scan_type: 'web',
+            }, { withCredentials: true });
+            setAriaAnalysis(data.analysis || data.response || 'No analysis returned.');
+        } catch (e) {
+            setAriaAnalysis('ARIA analysis unavailable: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setAnalyzing(false);
         }
     };
 
     const getSeverityCount = (sev) => results?.findings?.filter(f => f.severity === sev).length || 0;
+    const targetHost = target.trim() ? domainOf(target.trim()) : '';
+    const isLan = targetHost && isPrivateIP(targetHost);
 
     return (
         <div className="animate-in fade-in duration-500">
-            {/* Header Section */}
             <div className="mb-8">
                 <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4">
                     <ArrowLeft className="w-4 h-4" /> Back to Dashboard
@@ -97,14 +113,12 @@ const WebScanPage = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                {/* Left Column: Input & Modes */}
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-                        
+
                         <div className="space-y-1.5 mb-6">
                             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Target URL</label>
-                            <input 
+                            <input
                                 value={target}
                                 onChange={e => setTarget(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleExecuteScan()}
@@ -141,24 +155,24 @@ const WebScanPage = () => {
 
                         <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/50">
                             <label className="flex items-start gap-3 cursor-pointer select-none">
-                                <input 
-                                    type="checkbox" 
+                                <input
+                                    type="checkbox"
                                     checked={permissionGranted}
                                     onChange={e => setPermissionGranted(e.target.checked)}
                                     className="mt-0.5 w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-900"
                                 />
                                 <span className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                    I authorize Cybrain to perform a security assessment and intercept network patterns on the specified target.
+                                    I authorize Cybrain to perform a security assessment on the specified target.
                                 </span>
                             </label>
                         </div>
 
-                        {target.trim() && isPrivateIP(target.trim().replace(/^https?:\/\//, '').split('/')[0]) && (
+                        {isLan && (
                             <div className="mb-6 px-4 py-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-xl flex items-center gap-3">
                                 <Activity className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                                 <div>
-                                    <div className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">LAN Mode Detected</div>
-                                    <div className="text-xs text-green-600/80 dark:text-green-400/80 mt-0.5">Scan will run locally in browser</div>
+                                    <div className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">Internal Target Detected</div>
+                                    <div className="text-xs text-green-600/80 dark:text-green-400/80 mt-0.5">Routed to backend network scanner</div>
                                 </div>
                             </div>
                         )}
@@ -175,28 +189,15 @@ const WebScanPage = () => {
                             {loading ? (
                                 <>
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    {isLocalScan ? 'Scanning LAN...' : 'Initializing...'}
+                                    Scanning...
                                 </>
                             ) : (
                                 <>Start Scan <ChevronRight className="w-4 h-4" /></>
                             )}
                         </button>
-
-                        {loading && isLocalScan && (
-                            <div className="mt-4">
-                                <div className="flex justify-between text-xs font-medium text-slate-500 mb-1.5">
-                                    <span className="truncate">{scanStatusText || 'Initializing...'}</span>
-                                    <span>{scanProgress}%</span>
-                                </div>
-                                <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary-500 transition-all duration-300" style={{ width: `${scanProgress}%` }} />
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
-                {/* Right Column: Results */}
                 <div className="lg:col-span-8">
                     {error && (
                         <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm font-medium flex items-center gap-3 mb-6">
@@ -208,15 +209,13 @@ const WebScanPage = () => {
                     <AnimatePresence mode="wait">
                         {results ? (
                             <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} className="space-y-6">
-                                
-                                {/* Severity Counters */}
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     {[
-                                        { l: 'CRITICAL', c: 'red', v: getSeverityCount('CRITICAL') },
-                                        { l: 'HIGH', c: 'orange', v: getSeverityCount('HIGH') },
-                                        { l: 'MEDIUM', c: 'yellow', v: getSeverityCount('MEDIUM') },
-                                        { l: 'LOW', c: 'green', v: getSeverityCount('LOW') },
-                                        { l: 'INFO', c: 'blue', v: getSeverityCount('INFO') },
+                                        { l: 'CRITICAL', c: 'red',    v: getSeverityCount('CRITICAL') },
+                                        { l: 'HIGH',     c: 'orange', v: getSeverityCount('HIGH') },
+                                        { l: 'MEDIUM',   c: 'yellow', v: getSeverityCount('MEDIUM') },
+                                        { l: 'LOW',      c: 'green',  v: getSeverityCount('LOW') },
+                                        { l: 'INFO',     c: 'blue',   v: getSeverityCount('INFO') },
                                     ].map(s => (
                                         <div key={s.l} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-center shadow-sm">
                                             <div className={`text-2xl font-bold font-mono text-${s.c}-600 dark:text-${s.c}-400 mb-1`}>{s.v}</div>
@@ -225,7 +224,32 @@ const WebScanPage = () => {
                                     ))}
                                 </div>
 
-                                {/* Findings */}
+                                {/* ARIA Analysis Card */}
+                                <div className="bg-purple-50 dark:bg-purple-500/5 border border-purple-200 dark:border-purple-500/20 rounded-xl p-6 shadow-sm">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-purple-700 dark:text-purple-400 flex items-center gap-2">
+                                                <Terminal className="w-4 h-4" /> Analyze with ARIA
+                                            </h3>
+                                            <p className="text-xs text-purple-600/80 dark:text-purple-400/80 mt-1">AI-powered interpretation of scan findings.</p>
+                                        </div>
+                                        <button
+                                            onClick={analyzeWithAria}
+                                            disabled={analyzing}
+                                            className="px-4 py-2 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-semibold hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            {analyzing ? 'Analyzing...' : 'Analyze with ARIA'}
+                                        </button>
+                                    </div>
+                                    {ariaAnalysis && (
+                                        <div className="bg-white dark:bg-slate-950 border border-purple-100 dark:border-purple-500/10 rounded-lg p-4">
+                                            <pre className="text-xs text-slate-700 dark:text-slate-300 font-mono leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                                                {ariaAnalysis}
+                                            </pre>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="space-y-3">
                                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Findings Log</h3>
                                     {results.findings.map((finding, idx) => (
@@ -251,18 +275,18 @@ const WebScanPage = () => {
                                         </div>
                                     ))}
                                 </div>
-                                
+
                                 <div className="pt-6 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-                                    <button className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <a href="/download_report" className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
                                         <Download className="w-4 h-4" /> Export Report
-                                    </button>
+                                    </a>
                                 </div>
                             </motion.div>
                         ) : loading ? (
                             <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="h-96 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/50">
                                 <Activity className="w-12 h-12 text-primary-500 animate-pulse mb-6" />
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Analyzing Target</h3>
-                                <p className="text-sm text-slate-500 text-center max-w-sm px-4">Intercepting network packets and mapping target surface. Performing deep enumeration.</p>
+                                <p className="text-sm text-slate-500 text-center max-w-sm px-4">Intercepting network packets and mapping target surface.</p>
                             </motion.div>
                         ) : (
                             <div className="h-96 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900">

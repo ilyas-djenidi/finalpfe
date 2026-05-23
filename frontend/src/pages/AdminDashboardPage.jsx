@@ -65,12 +65,15 @@ const StatCard = ({ icon: Icon, label, value, sub, color }) => (
 
 const AdminDashboardPage = () => {
     const { user } = useAuth();
-    const [stats, setStats]       = useState(null);
-    const [topVulns, setTopVulns] = useState([]);
-    const [reports, setReports]   = useState([]);
-    const [loading, setLoading]   = useState(true);
-    const [error, setError]       = useState('');
+    const [stats, setStats]             = useState(null);
+    const [topVulns, setTopVulns]       = useState([]);
+    const [reports, setReports]         = useState([]);
+    const [loading, setLoading]         = useState(true);
+    const [error, setError]             = useState('');
     const [lastRefresh, setLastRefresh] = useState(null);
+    const [ariaStatus, setAriaStatus]   = useState(null);
+    const [clearingAi, setClearingAi]   = useState(false);
+    const [aiClearMsg, setAiClearMsg]   = useState('');
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
@@ -94,6 +97,26 @@ const AdminDashboardPage = () => {
     useEffect(() => {
         if (user?.role === 'admin') fetchAll();
     }, [user, fetchAll]);
+
+    useEffect(() => {
+        axios.get('/api/ai/status', { withCredentials: true })
+            .then(r => setAriaStatus(r.data))
+            .catch(() => {});
+    }, []);
+
+    const handleClearAllAi = async () => {
+        if (!window.confirm('Clear ALL users\' AI conversation histories? This cannot be undone.')) return;
+        setClearingAi(true);
+        setAiClearMsg('');
+        try {
+            const { data } = await axios.post('/api/admin/ai/clear-all', {}, { withCredentials: true });
+            setAiClearMsg(data.message || 'Done.');
+        } catch (err) {
+            setAiClearMsg(err.response?.data?.error || 'Failed to clear AI histories.');
+        } finally {
+            setClearingAi(false);
+        }
+    };
 
     if (user?.role !== 'admin') {
         return (
@@ -410,6 +433,49 @@ const AdminDashboardPage = () => {
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+
+            {/* ── ARIA AI Management ──────────────────────────────────────── */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-500/10 flex items-center justify-center text-cyan-600 dark:text-cyan-400 flex-shrink-0">
+                            <Activity className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                ARIA AI Management
+                                {ariaStatus && (
+                                    <span className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full font-mono border ${
+                                        ariaStatus.provider === 'gemini'
+                                            ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-400'
+                                            : ariaStatus.provider === 'ollama'
+                                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-400'
+                                            : 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-500/10 dark:border-yellow-500/30 dark:text-yellow-400'
+                                    }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${ariaStatus.provider === 'gemini' ? 'bg-green-500' : ariaStatus.provider === 'ollama' ? 'bg-blue-500' : 'bg-yellow-500'}`} />
+                                        {ariaStatus.provider === 'gemini' ? 'Gemini Online' : ariaStatus.provider === 'ollama' ? 'Ollama Local' : 'Offline Mode'}
+                                    </span>
+                                )}
+                            </h2>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-3">
+                                {ariaStatus?.model && <span>Model: <span className="font-mono text-slate-700 dark:text-slate-300">{ariaStatus.model}</span></span>}
+                                <span>Per-user isolated conversation histories</span>
+                            </div>
+                            {aiClearMsg && (
+                                <p className="text-xs mt-1 text-primary-600 dark:text-primary-400">{aiClearMsg}</p>
+                            )}
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleClearAllAi}
+                        disabled={clearingAi}
+                        className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${clearingAi ? 'animate-spin' : ''}`} />
+                        {clearingAi ? 'Clearing…' : 'Clear All AI Histories'}
+                    </button>
                 </div>
             </div>
 

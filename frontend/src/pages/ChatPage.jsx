@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import axios from 'axios';
 import ChatBot from '../components/ChatBot';
 
 const SAMPLE_CONTEXTS = [
@@ -20,13 +21,37 @@ const TOPIC_CARDS = [
   { icon: '🕷️', title: 'Penetration Test', q: 'What is a penetration testing methodology? Explain recon, scanning, exploitation' },
 ];
 
+function AriaBadge({ provider }) {
+  if (!provider) return null;
+  const cfg = provider === 'gemini'
+    ? { dot: 'bg-green-400', ring: 'bg-green-500/10 border-green-500/30 text-green-400', label: 'Gemini Online' }
+    : provider === 'ollama'
+    ? { dot: 'bg-blue-400',  ring: 'bg-blue-500/10 border-blue-500/30 text-blue-400',   label: 'Ollama Local' }
+    : { dot: 'bg-yellow-400',ring: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400', label: 'Offline Mode' };
+  return (
+    <span className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full font-mono border ${cfg.ring}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} style={{ animation: 'pulse 2s infinite' }} />
+      {cfg.label}
+    </span>
+  );
+}
+
 export default function ChatPage() {
-  const [activeContext, setActiveContext] = useState(SAMPLE_CONTEXTS[3]); // default: no context
-  const [chatKey, setChatKey] = useState(0); // force remount on context change
+  const [activeContext, setActiveContext] = useState(SAMPLE_CONTEXTS[3]);
+  const [chatKey, setChatKey]             = useState(0);
+  const [ariaStatus, setAriaStatus]       = useState(null);
+
+  useEffect(() => {
+    axios.get('/api/ai/status').then(r => setAriaStatus(r.data)).catch(() => {});
+  }, []);
 
   const handleContextSwitch = (ctx) => {
     setActiveContext(ctx);
-    setChatKey(k => k + 1); // reset chat history on context switch
+    setChatKey(k => k + 1);
+  };
+
+  const handleClearHistory = () => {
+    window.dispatchEvent(new CustomEvent('aria-clear-history'));
   };
 
   return (
@@ -55,7 +80,13 @@ export default function ChatPage() {
               <h1 className="text-2xl font-orbitron font-bold text-white tracking-wider">
                 ARIA <span className="text-cyan-400">AI</span> Chat
               </h1>
-              <p className="text-xs text-gray-500 font-inter">Powered by Google Gemini · CyBrain Security Intelligence</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs text-gray-500 font-inter">CyBrain Security Intelligence</p>
+                <AriaBadge provider={ariaStatus?.provider} />
+                {ariaStatus?.model && (
+                  <span className="text-[9px] text-gray-600 font-mono">{ariaStatus.model}</span>
+                )}
+              </div>
             </div>
           </div>
         </motion.div>
@@ -120,9 +151,18 @@ export default function ChatPage() {
             {/* Topic cards */}
             <div className="rounded-2xl border border-white/8 overflow-hidden"
                  style={{ background: 'rgba(255,255,255,0.02)' }}>
-              <div className="px-4 py-3 border-b border-white/8">
-                <p className="text-[10px] font-mono text-gray-500 tracking-widest uppercase">Security Topics</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">Click to ask instantly</p>
+              <div className="px-4 py-3 border-b border-white/8 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-mono text-gray-500 tracking-widest uppercase">Security Topics</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Click to ask instantly</p>
+                </div>
+                <button
+                  onClick={handleClearHistory}
+                  title="Clear chat history"
+                  className="text-[10px] text-gray-600 hover:text-red-400 font-mono border border-white/8 hover:border-red-500/30 px-2 py-1 rounded-lg transition-all"
+                >
+                  Clear History
+                </button>
               </div>
               <div className="p-3 space-y-2">
                 {TOPIC_CARDS.map((t) => (
@@ -130,11 +170,7 @@ export default function ChatPage() {
                     key={t.title}
                     whileHover={{ x: 4 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      // find the ChatBot and inject message
-                      // we use a global event bus via localStorage
-                      window.dispatchEvent(new CustomEvent('aria-inject', { detail: t.q }));
-                    }}
+                    onClick={() => window.dispatchEvent(new CustomEvent('aria-inject', { detail: t.q }))}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/5 hover:border-cyan-500/20 hover:bg-cyan-500/5 text-left transition-all group"
                   >
                     <span className="text-base flex-shrink-0">{t.icon}</span>
@@ -147,21 +183,22 @@ export default function ChatPage() {
               </div>
             </div>
 
-            {/* Gemini info card */}
+            {/* ARIA status card */}
             <div className="rounded-2xl border border-white/8 p-4"
                  style={{ background: 'linear-gradient(135deg, rgba(0,245,212,0.03), rgba(139,92,246,0.03))' }}>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border border-blue-500/20">
-                  <span className="text-[10px]">G</span>
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/20">
+                  <span className="text-cyan-400 text-[10px]">✦</span>
                 </div>
-                <p className="text-[11px] font-semibold text-gray-300">Google Gemini</p>
+                <p className="text-[11px] font-semibold text-gray-300">ARIA Status</p>
+                {ariaStatus && <AriaBadge provider={ariaStatus.provider} />}
               </div>
               <div className="space-y-2">
                 {[
-                  ['Model', 'Gemini 2.0 Flash'],
-                  ['Free tier', '15 req / minute'],
-                  ['Offline', 'Full KB fallback'],
-                  ['History', 'Per-user isolated'],
+                  ['Status',   ariaStatus?.status  || 'connecting…'],
+                  ['Provider', ariaStatus?.provider || '—'],
+                  ['Model',    ariaStatus?.model    || '—'],
+                  ['History',  'Per-user isolated'],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between">
                     <span className="text-[10px] text-gray-600">{k}</span>
