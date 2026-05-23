@@ -1,9 +1,10 @@
 # models.py
 """
-User model + authentication helpers — backed by Supabase via database.py.
+User model + authentication helpers.
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import bcrypt
@@ -17,7 +18,9 @@ class User(UserMixin):
     def __init__(self, user_id: int, username: str, password_hash: str,
                  role: str, permissions: list[str],
                  totp_secret: Optional[str] = None, totp_enabled: bool = False,
-                 failed_attempts: int = 0, locked_until: Optional[str] = None):
+                 failed_attempts: int = 0, locked_until: Optional[str] = None,
+                 is_active: bool = True, last_login: Optional[str] = None,
+                 login_count: int = 0):
         self.id              = user_id
         self.username        = username
         self._pass_hash      = password_hash
@@ -27,6 +30,9 @@ class User(UserMixin):
         self.totp_enabled    = bool(totp_enabled)
         self.failed_attempts = int(failed_attempts or 0)
         self.locked_until    = locked_until
+        self._is_active      = bool(is_active)
+        self.last_login      = last_login
+        self.login_count     = int(login_count or 0)
 
     def check_password(self, password: str) -> bool:
         try:
@@ -49,6 +55,10 @@ class User(UserMixin):
             return False
 
     @property
+    def is_active(self) -> bool:
+        return self._is_active
+
+    @property
     def is_admin(self) -> bool:
         return self.role == "admin"
 
@@ -56,12 +66,23 @@ class User(UserMixin):
     def is_locked(self) -> bool:
         if not self.locked_until:
             return False
-        from datetime import datetime, timezone
         try:
             unlock = datetime.fromisoformat(self.locked_until)
             return datetime.now(timezone.utc) < unlock
         except Exception:
             return False
+
+    @property
+    def lock_seconds_remaining(self) -> int:
+        """Seconds until the account unlocks (0 if not locked)."""
+        if not self.locked_until:
+            return 0
+        try:
+            unlock = datetime.fromisoformat(self.locked_until)
+            remaining = (unlock - datetime.now(timezone.utc)).total_seconds()
+            return max(0, int(remaining))
+        except Exception:
+            return 0
 
 
 def _row_to_user(row: dict) -> User:
@@ -75,21 +96,26 @@ def _row_to_user(row: dict) -> User:
         totp_enabled  = row.get("totp_enabled", False),
         failed_attempts = row.get("failed_attempts", 0),
         locked_until  = row.get("locked_until"),
+        is_active     = bool(row.get("is_active", 1)),
+        last_login    = row.get("last_login"),
+        login_count   = row.get("login_count", 0),
     )
 
 
-def authenticate_user(username: str, password: str) -> tuple[Optional["User"], str]:
+def authenticate_user(username: str, password: str) -> tuple[Optional["User"], str, int]:
     """
-    Validate credentials against Supabase.
-    Returns (user, error_message). On success error_message is "".
+    Validate credentials.
+    Returns (user, error_message, lock_seconds_remaining).
+    On success: (user, "", 0).
+    On lockout: (None, message, seconds_remaining).
+    On wrong password: (None, message, 0).
     """
-    from datetime import datetime, timezone
     from database import get_user_by_username, update_user
 
     row = get_user_by_username(username)
 
-    # Always run bcrypt to prevent timing attacks
-    dummy_hash = "$2b$12$" + "x" * 53
+    # Always run bcrypt to prevent timing attacks — even when user doesn't exist
+    dummy_hash     = "$2b$12$" + "x" * 53
     candidate_hash = row["password_hash"] if row else dummy_hash
 
     try:
@@ -98,27 +124,27 @@ def authenticate_user(username: str, password: str) -> tuple[Optional["User"], s
         password_ok = False
 
     if not row:
-        return None, "اسم المستخدم أو كلمة المرور غير صحيحة."
+        return None, "Invalid username or password.", 0
 
     user = _row_to_user(row)
 
     if user.is_locked:
-        return None, "الحساب مقفل مؤقتاً بسبب محاولات دخول متعددة. حاول لاحقاً."
+        secs = user.lock_seconds_remaining
+        return None, "Account temporarily locked due to multiple failed attempts.", secs
 
     if not password_ok:
         new_attempts = user.failed_attempts + 1
         locked_until = None
         if new_attempts >= 5:
-            from datetime import timedelta
             locked_until = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
         update_user(user.id, failed_attempts=new_attempts, locked_until=locked_until)
-        return None, "اسم المستخدم أو كلمة المرور غير صحيحة."
+        return None, "Invalid username or password.", 0
 
-    # Reset failed attempts counter on successful authentication
-    if user.failed_attempts > 0:
+    # Successful authentication — reset lockout counters
+    if user.failed_attempts > 0 or user.locked_until:
         update_user(user.id, failed_attempts=0, locked_until=None)
 
-    return user, ""
+    return user, "", 0
 
 
 def load_user_from_db(user_id: str) -> Optional[User]:

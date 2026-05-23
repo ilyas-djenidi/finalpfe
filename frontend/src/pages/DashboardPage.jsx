@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { 
-    Activity, Shield, AlertTriangle, FileText, 
-    Globe, Server, Code, Settings, ChevronRight
+import {
+    Activity, Shield, AlertTriangle, FileText,
+    Globe, Server, Code, Settings, ChevronRight,
+    Package, Zap, Network, Layers
 } from 'lucide-react';
 
 const SEVERITY_COLOR = {
@@ -17,10 +18,17 @@ const SEVERITY_COLOR = {
 };
 
 const SCAN_TYPE_BADGE = {
-    web:     { label: 'Web',     icon: Globe,  color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20' },
-    network: { label: 'Network', icon: Server, color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20' },
-    code:    { label: 'Code',    icon: Code,   color: 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20' },
-    apache:  { label: 'Config',  icon: Settings,color: 'bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border border-slate-200 dark:border-slate-500/20' },
+    web:          { label: 'Web',          icon: Globe,    color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20' },
+    network:      { label: 'Network',      icon: Server,   color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20' },
+    network_ext:  { label: 'Net (Ext)',    icon: Network,  color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20' },
+    network_int:  { label: 'Net (Int)',    icon: Network,  color: 'bg-teal-100 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400 border border-teal-200 dark:border-teal-500/20' },
+    code:         { label: 'Code',         icon: Code,     color: 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20' },
+    sast:         { label: 'SAST',         icon: Layers,   color: 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20' },
+    dast:         { label: 'DAST',         icon: Zap,      color: 'bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20' },
+    dependencies: { label: 'Dependencies', icon: Package,  color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-500/20' },
+    apache:       { label: 'Config',       icon: Settings, color: 'bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border border-slate-200 dark:border-slate-500/20' },
+    server_ext:   { label: 'Server (Ext)', icon: Server,   color: 'bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border border-slate-200 dark:border-slate-500/20' },
+    server_int:   { label: 'Server (Int)', icon: Settings, color: 'bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border border-slate-200 dark:border-slate-500/20' },
 };
 
 const StatCard = ({ label, value, icon: Icon, colorClass, delay }) => (
@@ -43,7 +51,8 @@ const StatCard = ({ label, value, icon: Icon, colorClass, delay }) => (
 );
 
 const RiskProgressBar = ({ score }) => {
-    const pct = Math.min(100, Math.max(0, score || 0));
+    const raw = parseFloat(score) || 0;
+    const pct = Math.min(100, Math.max(0, raw * 10));
     const color = pct >= 75 ? 'bg-red-500' : pct >= 50 ? 'bg-orange-500' : pct >= 25 ? 'bg-yellow-500' : 'bg-green-500';
     return (
         <div className="w-full flex items-center gap-3">
@@ -51,7 +60,7 @@ const RiskProgressBar = ({ score }) => {
                 <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%`, transition: 'width 1s ease' }} />
             </div>
             <span className="text-xs font-bold font-mono w-8 text-right text-slate-700 dark:text-slate-300">
-                {pct.toFixed(0)}
+                {raw.toFixed(1)}
             </span>
         </div>
     );

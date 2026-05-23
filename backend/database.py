@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 DB_PATH = "cybrain.db"
 
 # ── Thread-local connection pool ──────────────────────────────────────────────
-# Each thread keeps one persistent connection — safe for multithreaded Flask/Gunicorn.
 _local = threading.local()
 
 
@@ -20,7 +19,7 @@ def _get_db() -> sqlite3.Connection:
     if not getattr(_local, "conn", None):
         conn = sqlite3.connect(DB_PATH, check_same_thread=True)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")   # concurrent readers + one writer
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         _local.conn = conn
     return _local.conn
@@ -178,8 +177,17 @@ def get_user_by_id(user_id: int) -> dict | None:
     return _norm(row)
 
 
-def get_all_users() -> list[dict]:
-    return [_norm(r) for r in _get_db().execute("SELECT * FROM users ORDER BY id").fetchall()]
+def get_all_users(page: int = 1, per_page: int = 100) -> list[dict]:
+    offset = (page - 1) * per_page
+    return [
+        _norm(r) for r in _get_db().execute(
+            "SELECT * FROM users ORDER BY id LIMIT ? OFFSET ?", (per_page, offset)
+        ).fetchall()
+    ]
+
+
+def count_users() -> int:
+    return _get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
 
 def create_user(username: str, password: str, role: str = "analyst",
@@ -198,12 +206,12 @@ def create_user(username: str, password: str, role: str = "analyst",
             " VALUES (?,?,?,?,1,?,?)",
             (username, pw_hash, role, json.dumps(permissions), now, created_by),
         )
-        return True, "تم إنشاء المستخدم بنجاح."
+        return True, "User created successfully."
     except sqlite3.IntegrityError:
-        return False, "اسم المستخدم موجود مسبقاً."
+        return False, "Username already exists."
     except Exception as exc:
         logger.error("create_user: %s", exc)
-        return False, "خطأ في قاعدة البيانات."
+        return False, "Database error."
 
 
 def update_user(uid: int, role=None, permissions=None, is_active=None,
@@ -221,7 +229,7 @@ def update_user(uid: int, role=None, permissions=None, is_active=None,
         return True, ""
     values.append(uid)
     _exec(f"UPDATE users SET {', '.join(fields)} WHERE id=?", tuple(values))
-    return True, "تم التحديث بنجاح."
+    return True, "Updated successfully."
 
 
 def update_last_login(user_id: int):
@@ -239,7 +247,13 @@ def update_user_totp(user_id: int, secret: str, enabled: bool) -> tuple[bool, st
 
 def hard_delete_user(uid: int) -> tuple[bool, str]:
     _exec("DELETE FROM users WHERE id=?", (uid,))
-    return True, "تم حذف المستخدم."
+    return True, "User deleted."
+
+
+def count_active_admins() -> int:
+    return _get_db().execute(
+        "SELECT COUNT(*) FROM users WHERE role='admin' AND is_active=1"
+    ).fetchone()[0]
 
 
 # ── Audit log ─────────────────────────────────────────────────────────────────
@@ -260,11 +274,14 @@ def log_event(action: str, username: str = "", user_id: int | None = None,
 
 
 def get_audit_log(user_id: int | None = None, category: str | None = None,
-                  action: str | None = None, limit: int = 200) -> list[dict]:
+                  action: str | None = None, limit: int = 200,
+                  date_from: str | None = None, date_to: str | None = None) -> list[dict]:
     clauses, params = [], []
-    if user_id   is not None: clauses.append("user_id=?");   params.append(user_id)
-    if category:              clauses.append("category=?");  params.append(category)
-    if action:                clauses.append("action LIKE ?"); params.append(f"%{action}%")
+    if user_id   is not None: clauses.append("user_id=?");         params.append(user_id)
+    if category:              clauses.append("category=?");         params.append(category)
+    if action:                clauses.append("action LIKE ?");      params.append(f"%{action}%")
+    if date_from:             clauses.append("created_at >= ?");    params.append(date_from)
+    if date_to:               clauses.append("created_at <= ?");    params.append(date_to)
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     params.append(limit)
     rows = _get_db().execute(
@@ -326,20 +343,31 @@ def get_report(token: str) -> dict | None:
 
 def get_user_reports(user_id: int, limit: int = 100) -> list[dict]:
     return [dict(r) for r in _get_db().execute(
-        "SELECT * FROM scan_reports WHERE user_id=? ORDER BY stored_at DESC LIMIT ?",
+        "SELECT token,user_id,username,scan_type,target,risk_score,vuln_count,"
+        "critical_count,high_count,medium_count,low_count,stored_at"
+        " FROM scan_reports WHERE user_id=? ORDER BY stored_at DESC LIMIT ?",
         (user_id, limit),
     ).fetchall()]
 
 
-def get_all_reports(limit: int = 200) -> list[dict]:
+def get_all_reports(limit: int = 200, date_from: str | None = None,
+                    date_to: str | None = None, scan_type: str | None = None,
+                    username: str | None = None) -> list[dict]:
+    clauses, params = [], []
+    if date_from: clauses.append("stored_at >= ?");  params.append(date_from)
+    if date_to:   clauses.append("stored_at <= ?");  params.append(date_to)
+    if scan_type: clauses.append("scan_type=?");     params.append(scan_type)
+    if username:  clauses.append("username LIKE ?"); params.append(f"%{username}%")
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    params.append(limit)
     return [dict(r) for r in _get_db().execute(
-        "SELECT * FROM scan_reports ORDER BY stored_at DESC LIMIT ?", (limit,)
+        f"SELECT * FROM scan_reports {where} ORDER BY stored_at DESC LIMIT ?", params
     ).fetchall()]
 
 
 def delete_report(token: str) -> tuple[bool, str]:
     _exec("DELETE FROM scan_reports WHERE token=?", (token,))
-    return True, "تم حذف التقرير."
+    return True, "Report deleted."
 
 
 # ── Dashboard stats ───────────────────────────────────────────────────────────
@@ -395,38 +423,96 @@ def get_all_dashboard_stats() -> dict:
 
 
 def get_system_stats() -> dict:
-    db = _get_db()
+    db   = _get_db()
+    now  = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+
+    # ── Basic counts ──────────────────────────────────────────────────────────
     total_users  = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     active_users = db.execute("SELECT COUNT(*) FROM users WHERE is_active=1").fetchone()[0]
     total_scans  = db.execute("SELECT COUNT(*) FROM scan_reports").fetchone()[0]
     total_vulns  = db.execute("SELECT SUM(vuln_count) FROM scan_reports").fetchone()[0] or 0
     critical     = db.execute("SELECT SUM(critical_count) FROM scan_reports").fetchone()[0] or 0
-    today        = datetime.now(timezone.utc).date().isoformat()
     today_scans  = db.execute(
         "SELECT COUNT(*) FROM scan_reports WHERE stored_at LIKE ?", (f"{today}%",)
     ).fetchone()[0]
+
+    # ── This week ─────────────────────────────────────────────────────────────
+    week_scans = db.execute(
+        "SELECT COUNT(*) FROM scan_reports WHERE stored_at >= date('now','-7 days')"
+    ).fetchone()[0]
+
+    # ── Failed logins today ───────────────────────────────────────────────────
     failed_logins = db.execute(
         "SELECT COUNT(*) FROM audit_logs WHERE action='login_failed' AND created_at LIKE ?",
         (f"{today}%",),
     ).fetchone()[0]
+
+    # ── Risk distribution ─────────────────────────────────────────────────────
+    risk_row = db.execute(
+        "SELECT "
+        "  SUM(CASE WHEN risk_score >= 9.0 THEN 1 ELSE 0 END) as critical,"
+        "  SUM(CASE WHEN risk_score >= 7.0 AND risk_score < 9.0 THEN 1 ELSE 0 END) as high,"
+        "  SUM(CASE WHEN risk_score >= 4.0 AND risk_score < 7.0 THEN 1 ELSE 0 END) as medium,"
+        "  SUM(CASE WHEN risk_score >= 1.0 AND risk_score < 4.0 THEN 1 ELSE 0 END) as low,"
+        "  SUM(CASE WHEN risk_score < 1.0 THEN 1 ELSE 0 END) as minimal "
+        "FROM scan_reports"
+    ).fetchone()
+    risk_distribution = {
+        "critical": int(risk_row["critical"] or 0),
+        "high":     int(risk_row["high"]     or 0),
+        "medium":   int(risk_row["medium"]   or 0),
+        "low":      int(risk_row["low"]      or 0),
+        "minimal":  int(risk_row["minimal"]  or 0),
+    }
+
+    # ── Top scan types ────────────────────────────────────────────────────────
+    top_scan_types = [
+        {"type": r["scan_type"], "count": r["c"]}
+        for r in db.execute(
+            "SELECT scan_type, COUNT(*) as c FROM scan_reports "
+            "GROUP BY scan_type ORDER BY c DESC"
+        ).fetchall()
+    ]
+
+    # ── Recent scans (last 10) ────────────────────────────────────────────────
+    recent_scans = [
+        dict(r) for r in db.execute(
+            "SELECT token,username,scan_type,target,risk_score,vuln_count,stored_at "
+            "FROM scan_reports ORDER BY stored_at DESC LIMIT 10"
+        ).fetchall()
+    ]
+
+    # ── Top scanners ──────────────────────────────────────────────────────────
     top_scanners = db.execute(
-        "SELECT username, COUNT(*) as c FROM scan_reports GROUP BY username ORDER BY c DESC LIMIT 5"
+        "SELECT username, COUNT(*) as c FROM scan_reports "
+        "GROUP BY username ORDER BY c DESC LIMIT 5"
     ).fetchall()
+
+    # ── Recent events ─────────────────────────────────────────────────────────
     recent_events = db.execute(
-        "SELECT action, username, created_at FROM audit_logs ORDER BY created_at DESC LIMIT 10"
+        "SELECT action, username, created_at FROM audit_logs "
+        "ORDER BY created_at DESC LIMIT 10"
     ).fetchall()
+
+    # ── Users list (for admin user management) ────────────────────────────────
     users_list = [_norm(r) for r in db.execute("SELECT * FROM users ORDER BY id").fetchall()]
+
     return {
-        "total_users":   total_users,
-        "active_users":  active_users,
-        "total_scans":   total_scans,
-        "today_scans":   today_scans,
-        "total_vulns":   int(total_vulns),
-        "critical_vulns": int(critical),
-        "failed_logins": failed_logins,
-        "recent_events": [dict(r) for r in recent_events],
-        "top_scanners":  [{"username": r["username"], "count": r["c"]} for r in top_scanners],
-        "users_list":    users_list,
+        "total_users":       total_users,
+        "active_users":      active_users,
+        "total_scans":       total_scans,
+        "today_scans":       today_scans,
+        "scans_this_week":   week_scans,
+        "total_vulns":       int(total_vulns),
+        "critical_vulns":    int(critical),
+        "failed_logins":     failed_logins,
+        "risk_distribution": risk_distribution,
+        "top_scan_types":    top_scan_types,
+        "recent_scans":      recent_scans,
+        "recent_events":     [dict(r) for r in recent_events],
+        "top_scanners":      [{"username": r["username"], "count": r["c"]} for r in top_scanners],
+        "users_list":        users_list,
     }
 
 

@@ -1,30 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Database, AlertTriangle, ArrowLeft, Activity, Search } from 'lucide-react';
+import { Database, AlertTriangle, ArrowLeft, Activity, Search, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const AdminScansPage = () => {
     const { user } = useAuth();
-    const [scans, setScans] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [scans, setScans]         = useState([]);
+    const [loading, setLoading]     = useState(true);
+    const [error, setError]         = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
+    const fetchScans = async () => {
+        setLoading(true);
+        try {
+            const { data } = await axios.get('/api/admin/scans', { withCredentials: true });
+            setScans(data.reports || []);
+            setError('');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Failed to load scan records');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchScans = async () => {
-            try {
-                const { data } = await axios.get('/api/admin/scans', { withCredentials: true });
-                setScans(data.scans || []);
-            } catch (err) {
-                setError(err.response?.data?.error || 'Failed to load scan records');
-            } finally {
-                setLoading(false);
-            }
-        };
         if (user?.role === 'admin') fetchScans();
     }, [user]);
+
+    const handleDeleteScan = async (token) => {
+        if (!window.confirm('Delete this scan record permanently?')) return;
+        try {
+            await axios.delete(`/api/admin/scans/${token}`, { withCredentials: true });
+            fetchScans();
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to delete scan');
+        }
+    };
 
     if (user?.role !== 'admin') {
         return (
@@ -40,11 +52,15 @@ const AdminScansPage = () => {
         );
     }
 
-    const filteredScans = scans.filter(s => 
-        (s.target || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.scan_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.token || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredScans = scans.filter(s => {
+        const q = searchTerm.toLowerCase();
+        return (
+            (s.target    || '').toLowerCase().includes(q) ||
+            (s.scan_type || '').toLowerCase().includes(q) ||
+            (s.username  || '').toLowerCase().includes(q) ||
+            (s.token     || '').toLowerCase().includes(q)
+        );
+    });
 
     return (
         <div className="animate-in fade-in duration-500">
@@ -52,6 +68,7 @@ const AdminScansPage = () => {
                 <Link to="/admin" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4">
                     <ArrowLeft className="w-4 h-4" /> Back to Admin Panel
                 </Link>
+
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -88,9 +105,10 @@ const AdminScansPage = () => {
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Token</th>
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Target</th>
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                                    <th className="px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">User ID</th>
+                                    <th className="px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Operator</th>
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Findings</th>
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                                    <th className="px-6 py-3"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -108,7 +126,7 @@ const AdminScansPage = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-xs font-mono text-slate-500">
-                                            User #{s.user_id}
+                                            {s.username || `#${s.user_id}`}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
@@ -123,11 +141,20 @@ const AdminScansPage = () => {
                                         <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">
                                             {new Date(s.stored_at).toLocaleString()}
                                         </td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => handleDeleteScan(s.token)}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 dark:hover:text-red-400 rounded-lg transition-colors"
+                                                title="Delete scan"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                                 {filteredScans.length === 0 && (
                                     <tr>
-                                        <td colSpan="6" className="px-6 py-12 text-center text-sm text-slate-500">No scan records match your criteria.</td>
+                                        <td colSpan="7" className="px-6 py-12 text-center text-sm text-slate-500">No scan records match your criteria.</td>
                                     </tr>
                                 )}
                             </tbody>

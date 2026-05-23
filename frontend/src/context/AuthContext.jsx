@@ -1,19 +1,53 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-// ── Global axios defaults ──────────────────────────────────────────────────
-// All requests send session cookie automatically.
+// ── Toast system (no external library) ────────────────────────────────────────
+export const showToast = (message, type = 'error') => {
+    window.dispatchEvent(new CustomEvent('cybrain-toast', { detail: { message, type, id: Date.now() + Math.random() } }));
+};
+
+export const ToastContainer = () => {
+    const [toasts, setToasts] = useState([]);
+
+    useEffect(() => {
+        const handle = (e) => {
+            const t = e.detail;
+            setToasts(prev => [...prev.slice(-4), t]);
+            setTimeout(() => setToasts(prev => prev.filter(x => x.id !== t.id)), 4000);
+        };
+        window.addEventListener('cybrain-toast', handle);
+        return () => window.removeEventListener('cybrain-toast', handle);
+    }, []);
+
+    if (!toasts.length) return null;
+    return (
+        <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+            {toasts.map(t => (
+                <div
+                    key={t.id}
+                    className={`px-4 py-3 rounded-xl text-sm font-medium shadow-lg border max-w-sm backdrop-blur-sm animate-in slide-in-from-right-2 duration-300 ${
+                        t.type === 'warning'
+                            ? 'bg-orange-50 dark:bg-orange-900/80 border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300'
+                            : t.type === 'success'
+                            ? 'bg-green-50 dark:bg-green-900/80 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300'
+                            : 'bg-red-50 dark:bg-red-900/80 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
+                    }`}
+                >
+                    {t.message}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// ── Global axios defaults ──────────────────────────────────────────────────────
 axios.defaults.withCredentials = true;
 
-// ── CSRF token management ──────────────────────────────────────────────────
-// Flask-WTF stores the CSRF token in a cookie named "csrftoken" (or reads it
-// from the meta tag). We fetch it once and attach it as a request header so
-// every non-exempt POST/PATCH/DELETE succeeds without 400 CSRF errors.
+// ── CSRF token management ──────────────────────────────────────────────────────
 const _fetchCsrfToken = async () => {
     try {
-        // /api/auth/me is a safe GET — its response cookie carries the CSRF token
         const resp = await axios.get('/api/auth/me');
-        // Flask-WTF sets X-CSRFToken header on responses; fall back to cookie
         const fromHeader = resp.headers?.['x-csrftoken'];
         const fromCookie = document.cookie
             .split('; ')
@@ -29,11 +63,63 @@ const _fetchCsrfToken = async () => {
     }
 };
 
+// Module-level refs so the interceptor can call React callbacks
+const _authRef = { logout: null, navigate: null };
+
+// Set up the global interceptor once (idempotent via module flag)
+let _interceptorInstalled = false;
+function _installInterceptor() {
+    if (_interceptorInstalled) return;
+    _interceptorInstalled = true;
+
+    const AUTH_URLS = ['/api/auth/login', '/api/auth/register', '/api/auth/me', '/api/auth/totp-verify'];
+
+    axios.interceptors.response.use(
+        r => r,
+        async (err) => {
+            const status  = err.response?.status;
+            const url     = err.config?.url || '';
+            const isAuth  = AUTH_URLS.some(u => url.includes(u));
+
+            if (status === 401 && !isAuth) {
+                showToast('Session expired — please log in again', 'warning');
+                if (_authRef.logout) await _authRef.logout();
+                if (_authRef.navigate) _authRef.navigate('/login');
+            } else if (status === 403 && !isAuth) {
+                showToast("You don't have permission for this action", 'error');
+            } else if (status === 429) {
+                const retryAfter = err.response?.headers?.['retry-after'];
+                const wait = retryAfter ? ` — please wait ${retryAfter}s` : ' — please wait';
+                showToast(`Too many requests${wait}`, 'warning');
+            } else if (!err.response && !isAuth) {
+                showToast('Connection error — check your network', 'error');
+            }
+            return Promise.reject(err);
+        }
+    );
+}
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [user,    setUser]    = useState(null);   // null = loading
+    const [user,    setUser]    = useState(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+
+    // Keep refs fresh so the interceptor can use them without stale closures
+    const logout = useCallback(async () => {
+        try { await axios.post('/api/auth/logout', {}); } catch { /* swallow */ }
+        setUser(false);
+        delete axios.defaults.headers.common['X-CSRFToken'];
+    }, []);
+
+    useEffect(() => {
+        _authRef.logout   = logout;
+        _authRef.navigate = navigate;
+    }, [logout, navigate]);
+
+    // Install interceptor on mount (once per app lifetime)
+    useEffect(() => { _installInterceptor(); }, []);
 
     const fetchMe = useCallback(async () => {
         try {
@@ -48,7 +134,7 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => { fetchMe(); }, [fetchMe]);
 
-    // Refresh auth state + CSRF token every 25 minutes (session lifetime is 30 min)
+    // Refresh auth + CSRF every 25 minutes
     useEffect(() => {
         const interval = setInterval(fetchMe, 25 * 60 * 1000);
         return () => clearInterval(interval);
@@ -58,10 +144,8 @@ export const AuthProvider = ({ children }) => {
         const { data } = await axios.post('/api/auth/login', { username, password });
         if (data.ok) {
             setUser(data.user);
-            // Refresh CSRF token after successful login
             await _fetchCsrfToken();
         }
-        // Caller checks data.totp_required to show TOTP step
         return data;
     };
 
@@ -72,14 +156,6 @@ export const AuthProvider = ({ children }) => {
             await _fetchCsrfToken();
         }
         return data;
-    };
-
-    const logout = async () => {
-        try {
-            await axios.post('/api/auth/logout', {});
-        } catch { /* swallow */ }
-        setUser(false);
-        delete axios.defaults.headers.common['X-CSRFToken'];
     };
 
     const register = async (username, password) => {

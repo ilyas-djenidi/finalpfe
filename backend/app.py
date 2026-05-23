@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import tempfile
 import zipfile
 from functools import wraps
@@ -21,7 +22,7 @@ import qrcode
 
 from dotenv import load_dotenv
 from flask import (
-    Flask, Response, current_app, flash, jsonify, redirect,
+    Flask, Response, current_app, flash, g, jsonify, redirect,
     render_template, request, session, url_for,
 )
 from flask_limiter import Limiter
@@ -34,7 +35,7 @@ from flask_wtf.csrf import CSRFProtect
 
 from database import (
     init_db,
-    get_user_by_id, get_all_users,
+    get_user_by_id, get_all_users, count_users, count_active_admins,
     create_user, update_user, hard_delete_user,
     update_last_login, update_user_totp,
     log_event, get_audit_log, get_audit_stats,
@@ -107,6 +108,12 @@ _ALLOWED_ORIGINS = [
 ]
 CORS(app, origins=_ALLOWED_ORIGINS, supports_credentials=True)
 
+# ── CSP nonce ─────────────────────────────────────────────────────────────────
+@app.before_request
+def set_csp_nonce():
+    g.csp_nonce = secrets.token_hex(16)
+
+
 # ── Security headers ──────────────────────────────────────────────────────────
 @app.after_request
 def set_security_headers(response):
@@ -116,15 +123,18 @@ def set_security_headers(response):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"]           = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"]        = "geolocation=(), microphone=(), camera=()"
-    response.headers["Content-Security-Policy"]   = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self'; "
-        "font-src 'self' data:; "
-        "frame-ancestors 'self';"
+    nonce = getattr(g, "csp_nonce", "")
+    response.headers["Content-Security-Policy"] = (
+        f"default-src 'self'; "
+        f"script-src 'self' 'nonce-{nonce}'; "
+        f"style-src 'self' 'nonce-{nonce}'; "
+        f"img-src 'self' data: https:; "
+        f"connect-src 'self'; "
+        f"font-src 'self' data:; "
+        f"frame-ancestors 'self';"
     )
+    if nonce:
+        response.headers["X-CSP-Nonce"] = nonce
     if "text/html" in response.headers.get("Content-Type", ""):
         response.headers["Content-Type"] = "text/html; charset=utf-8"
     if os.environ.get("FLASK_ENV") == "production":
@@ -211,7 +221,7 @@ def admin_required(f):
     @login_required
     def wrapper(*args, **kwargs):
         if current_user.role != "admin":
-            return redirect(url_for("home"))
+            return jsonify({"error": "Admin access required."}), 403
         return f(*args, **kwargs)
     return wrapper
 
@@ -258,7 +268,7 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
-        user, err = authenticate_user(username, password)
+        user, err, _lock_secs = authenticate_user(username, password)
 
         if user:
             if user.totp_enabled:
@@ -677,7 +687,14 @@ def ai_analyze():
         scan_type = result.get("scan_type", "web")
 
     if not findings:
-        return jsonify({"error": "لا توجد نتائج للتحليل."}), 400
+        return jsonify({"error": "No findings to analyze."}), 400
+    if not isinstance(findings, list):
+        return jsonify({"error": "findings must be a list."}), 400
+    if len(findings) > 500:
+        return jsonify({"error": "findings list exceeds maximum of 500 items."}), 400
+    findings = [f for f in findings if isinstance(f, dict)]
+    if not findings:
+        return jsonify({"error": "findings must contain dict objects."}), 400
 
     aria     = get_aria()
     analysis = aria.analyze_findings(findings, target, scan_type)
@@ -686,7 +703,7 @@ def ai_analyze():
 
 @app.route("/api/ai/chat", methods=["POST"])
 @login_required
-@limiter.limit("30/minute")
+@limiter.limit("10/minute")
 def ai_chat():
     data    = request.get_json(silent=True) or {}
     message = (data.get("message") or "").strip()
@@ -698,8 +715,43 @@ def ai_chat():
         return jsonify({"error": "الرسالة طويلة جداً (الحد 2000 حرف)."}), 400
 
     aria  = get_aria()
-    reply = aria.chat(message, context)
+    reply = aria.chat(message, context, user_id=str(current_user.id))
     return jsonify({"reply": reply, "ai_mode": "online" if aria.ai_active else "offline"})
+
+
+@app.route("/api/ai/fix", methods=["POST"])
+@require_permission("run_scan")
+@limiter.limit("10/minute")
+@csrf.exempt
+def ai_fix():
+    data     = request.get_json(silent=True) or {}
+    vuln_type = (data.get("vuln_type") or "").strip()
+    context   = data.get("context", {})
+    if not vuln_type:
+        return jsonify({"error": "vuln_type required."}), 400
+    aria = get_aria()
+    fix  = aria.generate_fix(vuln_type, context)
+    return jsonify({"fix": fix})
+
+
+@app.route("/api/ai/history/clear", methods=["POST"])
+@login_required
+@csrf.exempt
+def ai_history_clear():
+    aria = get_aria()
+    aria.clear_history(str(current_user.id))
+    return jsonify({"ok": True, "message": "Conversation history cleared."})
+
+
+@app.route("/api/ai/status")
+@login_required
+def ai_status():
+    aria = get_aria()
+    return jsonify({
+        "status":   "online" if aria.ai_active else "offline",
+        "model":    getattr(aria, "_model_name", "gemini-2.0-flash"),
+        "provider": getattr(aria, "provider", "unknown"),
+    })
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -886,11 +938,14 @@ def api_login():
     if not username or not password:
         return jsonify({"ok": False, "error": "Username and password required."}), 400
 
-    user, err = authenticate_user(username, password)
+    user, err, lock_secs = authenticate_user(username, password)
     if not user:
         log_event("login_failed", username, category="auth",
                   ip_address=request.remote_addr, status="failed", details=err)
-        return jsonify({"ok": False, "error": err or "Invalid credentials."}), 401
+        resp = {"ok": False, "error": err or "Invalid credentials."}
+        if lock_secs:
+            resp["lock_seconds_remaining"] = lock_secs
+        return jsonify(resp), 401
 
     if user.totp_enabled:
         session["pending_totp_user_id"] = user.id
@@ -923,10 +978,15 @@ def api_me():
     return jsonify({
         "authenticated": True,
         "user": {
-            "id":       current_user.id,
-            "username": current_user.username,
-            "role":     current_user.role,
-            "is_admin": current_user.is_admin,
+            "id":           current_user.id,
+            "username":     current_user.username,
+            "role":         current_user.role,
+            "is_admin":     current_user.is_admin,
+            "permissions":  list(current_user._permissions),
+            "totp_enabled": current_user.totp_enabled,
+            "is_active":    current_user.is_active,
+            "last_login":   current_user.last_login,
+            "login_count":  current_user.login_count,
         },
     })
 
@@ -968,6 +1028,76 @@ def api_totp_verify():
         "ok":   True,
         "user": {"username": user.username, "role": user.role, "id": user.id},
     })
+
+
+# ── TOTP setup / enable (React API) ──────────────────────────────────────
+
+@app.route("/api/auth/totp/setup", methods=["POST"])
+@login_required
+@csrf.exempt
+def api_totp_setup():
+    """Generate a new TOTP secret and return QR code as base64 PNG."""
+    secret = pyotp.random_base32()
+    session["totp_setup_secret"] = secret
+    uri = pyotp.TOTP(secret).provisioning_uri(
+        name=current_user.username, issuer_name="CyBrain Security"
+    )
+    import qrcode as _qrcode
+    img = _qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+    return jsonify({"secret": secret, "qr_b64": qr_b64})
+
+
+@app.route("/api/auth/totp/enable", methods=["POST"])
+@login_required
+@csrf.exempt
+def api_totp_enable():
+    """Verify TOTP token then persist totp_enabled=True."""
+    data   = request.get_json(silent=True) or {}
+    token  = (data.get("token") or "").strip()
+    secret = session.get("totp_setup_secret")
+    if not secret:
+        return jsonify({"ok": False, "error": "No TOTP setup session found."}), 400
+    if not token:
+        return jsonify({"ok": False, "error": "Token required."}), 400
+    if not pyotp.TOTP(secret).verify(token, valid_window=1):
+        return jsonify({"ok": False, "error": "Invalid verification code."}), 400
+    ok, msg = update_user_totp(current_user.id, secret, True)
+    if ok:
+        session.pop("totp_setup_secret", None)
+        log_event("totp_enabled", current_user.username, current_user.id,
+                  category="auth", ip_address=request.remote_addr)
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 500)
+
+
+# ── Change password (React JSON API) ─────────────────────────────────────
+
+@app.route("/api/auth/change-password", methods=["POST"])
+@login_required
+@csrf.exempt
+def api_change_password():
+    """JSON endpoint: verify current password, enforce complexity on new."""
+    data       = request.get_json(silent=True) or {}
+    current_pw = data.get("current_password", "")
+    new_pw     = data.get("new_password", "")
+
+    if not current_pw or not new_pw:
+        return jsonify({"ok": False, "error": "current_password and new_password required."}), 400
+
+    row = get_user_by_id(current_user.id)
+    if not row or not bcrypt.checkpw(current_pw.encode("utf-8"), row["password_hash"].encode("utf-8")):
+        return jsonify({"ok": False, "error": "Current password is incorrect."}), 400
+
+    ok, msg = check_password_complexity(new_pw)
+    if not ok:
+        return jsonify({"ok": False, "error": msg}), 400
+
+    update_user(current_user.id, new_password=new_pw)
+    log_event("password_changed", current_user.username, current_user.id,
+              category="auth", ip_address=request.remote_addr)
+    return jsonify({"ok": True, "message": "Password changed successfully."})
 
 
 # ── Self-registration ─────────────────────────────────────────────────────
@@ -1072,12 +1202,44 @@ def api_report(token: str):
     })
 
 
+@app.route("/api/reports/<token>", methods=["DELETE"])
+@login_required
+@csrf.exempt
+def api_delete_report(token: str):
+    if not _UUID_RE.match(token):
+        return jsonify({"error": "Invalid report token."}), 400
+    data = get_report(token)
+    if not data:
+        return jsonify({"error": "Report not found."}), 404
+    if data.get("user_id") != current_user.id and current_user.role != "admin":
+        log_event("idor_attempt", current_user.username, current_user.id,
+                  category="security", resource=f"/api/reports/{token}",
+                  ip_address=request.remote_addr, status="blocked")
+        return jsonify({"error": "Access denied."}), 403
+    ok, msg = delete_report(token)
+    if ok:
+        log_event("report_deleted", current_user.username, current_user.id,
+                  category="scan", resource=token, status="success")
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 500)
+
+
+def _rtl_text(text: str) -> str:
+    """Apply Arabic reshaping + bidi reorder if libraries are available."""
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        return get_display(arabic_reshaper.reshape(text))
+    except Exception:
+        return text
+
+
 @app.route("/download_report")
 @login_required
 @limiter.limit("10/minute")
-def download_report_md():
-    """Download most recent (or token-specified) report as Markdown."""
+def download_report_pdf():
+    """Download report as a professional PDF (with Arabic RTL support when lang=ar)."""
     token = request.args.get("token", "").strip()
+    lang  = request.args.get("lang", "en").strip().lower()
     if token and _UUID_RE.match(token):
         data = get_report(token)
     else:
@@ -1092,32 +1254,123 @@ def download_report_md():
     vulns  = result.get("vulnerabilities", [])
     target = result.get("target", "unknown")
     score  = data.get("risk_score", 0)
+    arabic = lang == "ar"
 
-    lines = [
-        f"# CyBrain Security Report",
-        f"**Target:** {target}  ",
-        f"**Risk Score:** {score}/10  ",
-        f"**Scanned At:** {data.get('stored_at', '')}  ",
-        f"**Total Findings:** {len(vulns)}",
-        "", "---", "", "## Findings", "",
-    ]
-    for i, v in enumerate(vulns, 1):
-        sev  = (v.get("severity") or "info").upper()
-        title = v.get("title") or v.get("check") or "Finding"
-        desc  = v.get("description") or ""
-        rem   = v.get("remediation") or ""
-        lines += [
-            f"### {i}. [{sev}] {title}",
-            f"> {desc}" if desc else "",
-            f"**Remediation:** {rem}" if rem else "",
-            "",
+    try:
+        from reportlab.lib import colors as rl_colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+        )
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=2*cm, rightMargin=2*cm,
+            topMargin=2*cm, bottomMargin=2*cm,
+        )
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "title", parent=styles["Title"],
+            fontSize=20, spaceAfter=6,
+            alignment=2 if arabic else 0,
+        )
+        h2_style = ParagraphStyle(
+            "h2", parent=styles["Heading2"],
+            fontSize=13, spaceAfter=4,
+            alignment=2 if arabic else 0,
+        )
+        body_style = ParagraphStyle(
+            "body", parent=styles["Normal"],
+            fontSize=9, leading=14,
+            alignment=2 if arabic else 0,
+        )
+
+        SEV_COLOR = {
+            "critical": rl_colors.HexColor("#c0392b"),
+            "high":     rl_colors.HexColor("#e67e22"),
+            "medium":   rl_colors.HexColor("#f1c40f"),
+            "low":      rl_colors.HexColor("#2ecc71"),
+            "info":     rl_colors.HexColor("#3498db"),
+        }
+
+        def _p(text: str, style=None) -> Paragraph:
+            t = _rtl_text(text) if arabic else text
+            return Paragraph(t, style or body_style)
+
+        def _label(text: str) -> str:
+            return _rtl_text(text) if arabic else text
+
+        story = [
+            _p("CyBrain Security Platform — Vulnerability Report", title_style),
+            HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#2c3e50")),
+            Spacer(1, 0.3*cm),
+            _p(f"Target: {target}"),
+            _p(f"Risk Score: {score:.1f} / 10"),
+            _p(f"Findings: {len(vulns)}"),
+            _p(f"Generated: {data.get('stored_at', '')}"),
+            Spacer(1, 0.5*cm),
+            _p("Findings", h2_style),
+            HRFlowable(width="100%", thickness=0.5, color=rl_colors.grey),
+            Spacer(1, 0.3*cm),
         ]
-    md = "\n".join(lines)
-    return current_app.response_class(
-        md,
-        mimetype="text/markdown",
-        headers={"Content-Disposition": "attachment; filename=vulnerability_report.md"},
-    )
+
+        for i, v in enumerate(vulns, 1):
+            sev   = (v.get("severity") or "info").lower()
+            title = v.get("title") or v.get("check") or "Finding"
+            desc  = v.get("description") or ""
+            rem   = v.get("remediation") or ""
+            color = SEV_COLOR.get(sev, rl_colors.grey)
+            badge = [[_label(f"[{sev.upper()}]  {title}")]]
+            tbl   = Table(badge, colWidths=[doc.width])
+            tbl.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), color),
+                ("TEXTCOLOR",  (0, 0), (-1, -1), rl_colors.white),
+                ("FONTSIZE",   (0, 0), (-1, -1), 10),
+                ("FONTNAME",   (0, 0), (-1, -1), "Helvetica-Bold"),
+                ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING",   (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+            ]))
+            story.append(tbl)
+            if desc:
+                story.append(_p(desc))
+            if rem:
+                story.append(_p(f"Remediation: {rem}"))
+            story.append(Spacer(1, 0.4*cm))
+
+        doc.build(story)
+        pdf_bytes = buf.getvalue()
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=cybrain_report.pdf"},
+        )
+
+    except ImportError:
+        # Graceful degradation: serve Markdown if reportlab not installed
+        lines = [
+            "# CyBrain Security Report",
+            f"**Target:** {target}",
+            f"**Risk Score:** {score}/10",
+            f"**Generated:** {data.get('stored_at', '')}",
+            f"**Total Findings:** {len(vulns)}",
+            "", "---", "", "## Findings", "",
+        ]
+        for i, v in enumerate(vulns, 1):
+            sev   = (v.get("severity") or "info").upper()
+            title = v.get("title") or v.get("check") or "Finding"
+            desc  = v.get("description") or ""
+            rem   = v.get("remediation") or ""
+            lines += [f"### {i}. [{sev}] {title}", desc, f"Remediation: {rem}" if rem else "", ""]
+        return current_app.response_class(
+            "\n".join(lines),
+            mimetype="text/markdown",
+            headers={"Content-Disposition": "attachment; filename=vulnerability_report.md"},
+        )
 
 
 @app.route("/download_report_csv")
@@ -1194,8 +1447,18 @@ def api_admin_stats():
 @app.route("/api/admin/users")
 @admin_required
 def api_admin_users():
-    users = get_all_users()
-    return jsonify({"users": [dict(u) for u in users]})
+    page     = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    per_page = min(max(per_page, 1), 200)
+    users    = get_all_users(page=page, per_page=per_page)
+    total    = count_users()
+    return jsonify({
+        "users":    [dict(u) for u in users],
+        "total":    total,
+        "page":     page,
+        "per_page": per_page,
+        "pages":    max(1, -(-total // per_page)),
+    })
 
 
 @app.route("/api/admin/users", methods=["POST"])
@@ -1254,6 +1517,9 @@ def api_admin_update_user(uid: int):
 def api_admin_delete_user(uid: int):
     if uid == current_user.id:
         return jsonify({"ok": False, "error": "Cannot delete your own account."}), 400
+    target_row = get_user_by_id(uid)
+    if target_row and target_row["role"] == "admin" and count_active_admins() <= 1:
+        return jsonify({"ok": False, "error": "Cannot delete the last active admin account."}), 400
     ok, msg = hard_delete_user(uid)
     if ok:
         log_event("user_deleted", current_user.username, current_user.id,
@@ -1264,13 +1530,19 @@ def api_admin_delete_user(uid: int):
 @app.route("/api/admin/scans")
 @admin_required
 def api_admin_scans():
-    filter_user = request.args.get("user", "").strip()
-    filter_type = request.args.get("type", "").strip()
-    all_reports = get_all_reports(limit=500)
-    if filter_user:
-        all_reports = [r for r in all_reports if filter_user.lower() in (r.get("username") or "").lower()]
-    if filter_type:
-        all_reports = [r for r in all_reports if r.get("scan_type") == filter_type]
+    filter_user = request.args.get("user", "").strip() or None
+    filter_type = request.args.get("type", "").strip() or None
+    date_from   = request.args.get("date_from", "").strip() or None
+    date_to     = request.args.get("date_to", "").strip() or None
+    page        = request.args.get("page", 1, type=int)
+    per_page    = min(request.args.get("per_page", 50, type=int), 500)
+    all_reports = get_all_reports(
+        limit=per_page,
+        date_from=date_from,
+        date_to=date_to,
+        scan_type=filter_type,
+        username=filter_user,
+    )
     top_vulns = get_top_vulnerabilities(limit=10)
     return jsonify({
         "reports":   [dict(r) for r in all_reports],
@@ -1294,11 +1566,14 @@ def api_admin_delete_scan(token: str):
 @app.route("/api/admin/audit")
 @admin_required
 def api_admin_audit():
-    uid      = request.args.get("user_id", type=int)
-    category = request.args.get("category")
-    action   = request.args.get("action")
-    logs     = get_audit_log(user_id=uid, category=category, action=action, limit=200)
-    stats    = get_audit_stats()
+    uid       = request.args.get("user_id", type=int)
+    category  = request.args.get("category") or None
+    action    = request.args.get("action") or None
+    date_from = request.args.get("date_from") or None
+    date_to   = request.args.get("date_to") or None
+    logs      = get_audit_log(user_id=uid, category=category, action=action,
+                               date_from=date_from, date_to=date_to, limit=200)
+    stats     = get_audit_stats()
     return jsonify({"logs": [dict(l) for l in logs], "stats": dict(stats)})
 
 
@@ -1685,7 +1960,7 @@ def chat_bridge():
         return jsonify({"response": "Empty message."}), 400
     try:
         aria  = get_aria()
-        reply = aria.chat(message, context)
+        reply = aria.chat(message, context, user_id=str(current_user.id))
         return jsonify({"response": reply})
     except Exception as exc:
         logger.exception("chat_bridge error")

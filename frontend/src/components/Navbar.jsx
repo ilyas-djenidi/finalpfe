@@ -78,6 +78,17 @@ const Navbar = () => {
                             <NavLink to="/dependency-scan" label="Dependencies" active={pathname === '/dependency-scan'} />
                             <NavLink to="/dast-scan" label="DAST" active={pathname === '/dast-scan'} />
                             <NavLink to="/apache-scan" label="Config" active={pathname === '/apache-scan'} />
+                            {/* AI Chat — highlighted link */}
+                            <Link
+                                to="/chat"
+                                className={`px-3 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                                    pathname === '/chat'
+                                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                                        : 'text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/20'
+                                }`}
+                            >
+                                <span className="text-[11px]">✦</span> ARIA AI
+                            </Link>
                             {user.role === 'admin' && (
                                 <NavLink to="/admin" label="Admin" active={pathname.startsWith('/admin')} />
                             )}
@@ -158,6 +169,7 @@ const Navbar = () => {
                     <Link to="/dependency-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Dependencies</Link>
                     <Link to="/dast-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">DAST</Link>
                     <Link to="/apache-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Config</Link>
+                    <Link to="/chat" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10">✦ ARIA AI Chat</Link>
                     {user.role === 'admin' && (
                         <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-primary-600 dark:text-primary-400 hover:bg-slate-50 dark:hover:bg-slate-800">Admin Panel</Link>
                     )}

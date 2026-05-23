@@ -68,6 +68,132 @@ _RULESETS_BY_LANG: dict[str, list[str]] = {
 
 _ALWAYS_RULESETS = ["p/secrets", "p/owasp-top-ten"]
 
+# ── Built-in scanner — runs WITHOUT any external tools installed ───────────────
+# These patterns are the baseline guarantee: even if Semgrep/Gitleaks/Bandit
+# are missing, we still catch the most critical issues.
+
+_JS_EXTS = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".vue"}
+_PY_EXTS = {".py"}
+_ALL_EXTS = _JS_EXTS | _PY_EXTS | {".env", ".yml", ".yaml", ".json", ".xml", ".config", ".toml", ".rb", ".go", ".java", ".php", ".cs"}
+
+# Secret patterns — applied to EVERY file regardless of language
+_SECRET_PATTERNS: list[tuple] = [
+    # AWS Access Key ID — 20-char AKIA… string
+    (re.compile(r'AKIA[0-9A-Z]{16}'), 'critical',
+     'Hardcoded AWS Access Key ID',
+     'AWS Access Key ID found in source code. Revoke and rotate immediately via AWS IAM console.'),
+    # AWS Secret Access Key — 40-char base64 value after aws_secret… variable
+    (re.compile(r'(?i)\b\w*aws_secret\w*\s*=\s*["\'][A-Za-z0-9/+=]{35,}["\']'), 'critical',
+     'Hardcoded AWS Secret Access Key',
+     'AWS Secret Access Key in source code. Revoke immediately and use IAM roles or environment variables.'),
+    # Stripe live key
+    (re.compile(r'sk_live_[0-9a-zA-Z]{24,}'), 'critical',
+     'Hardcoded Stripe Live Secret Key',
+     'Stripe live key found. Revoke at dashboard.stripe.com → Developers → API keys immediately.'),
+    # GitHub PAT
+    (re.compile(r'ghp_[0-9a-zA-Z]{36}'), 'critical',
+     'Hardcoded GitHub Personal Access Token',
+     'GitHub PAT found. Revoke at github.com/settings/tokens immediately.'),
+    # Generic PEM private keys
+    (re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'), 'critical',
+     'Private key material in source code',
+     'Private key found in source code. Remove and rotate immediately — assume it is compromised.'),
+    # Variables whose NAME contains a secret keyword assigned a string value
+    (re.compile(r'(?i)\b\w*(?:password|passwd|secret|api_?key|access_?key|auth_?token|db_?pass)\w*\s*=\s*["\'][^"\']{4,}["\']'), 'critical',
+     'Hardcoded credential in source variable',
+     'Sensitive credential hardcoded in source code. Use environment variables or a secrets manager instead.'),
+    # Google API key prefix
+    (re.compile(r'AIza[0-9A-Za-z\-_]{35}'), 'critical',
+     'Hardcoded Google API Key',
+     'Google API key found. Revoke at console.cloud.google.com → Credentials.'),
+    # Slack tokens
+    (re.compile(r'xox[baprs]-[0-9A-Za-z\-]{10,}'), 'critical',
+     'Hardcoded Slack Token',
+     'Slack token found in source code. Revoke at api.slack.com/apps.'),
+]
+
+# JavaScript/TypeScript/JSX patterns
+_JS_PATTERNS: list[tuple] = [
+    (re.compile(r'\beval\s*\('), 'high',
+     'Dangerous eval() — arbitrary code execution',
+     'eval() executes arbitrary code strings. If the argument comes from user input this is RCE. '
+     'Replace with JSON.parse() for data, or refactor to avoid dynamic code execution entirely.'),
+    (re.compile(r'dangerouslySetInnerHTML'), 'high',
+     'React dangerouslySetInnerHTML — XSS',
+     'dangerouslySetInnerHTML bypasses React\'s built-in XSS escaping. '
+     'Sanitize HTML with DOMPurify before passing it: dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(val) }}'),
+    (re.compile(r'\.innerHTML\s*=(?!=)'), 'high',
+     'Direct innerHTML assignment — XSS',
+     'Setting innerHTML with user-controlled data enables stored or reflected XSS. '
+     'Use element.textContent for text, or DOMPurify.sanitize() before assigning innerHTML.'),
+    (re.compile(r'document\.write\s*\('), 'high',
+     'document.write() — XSS risk',
+     'document.write() with user-controlled input enables XSS. '
+     'Avoid it entirely — use DOM manipulation methods instead.'),
+    (re.compile(r'new\s+Function\s*\('), 'high',
+     'Dynamic Function constructor — code injection',
+     'new Function() constructs and executes code dynamically — equivalent to eval(). '
+     'Avoid or validate and whitelist inputs strictly.'),
+    (re.compile(r'setTimeout\s*\(\s*(?:["\']|`)[^)]{3}'), 'medium',
+     'setTimeout with string argument — implicit eval',
+     'Passing a string to setTimeout is equivalent to eval(). '
+     'Use an arrow function: setTimeout(() => yourFn(), ms)'),
+    (re.compile(r'setInterval\s*\(\s*(?:["\']|`)[^)]{3}'), 'medium',
+     'setInterval with string argument — implicit eval',
+     'Passing a string to setInterval is equivalent to eval(). '
+     'Use an arrow function: setInterval(() => yourFn(), ms)'),
+    (re.compile(r'__html\s*:'), 'medium',
+     '__html prop passed to dangerouslySetInnerHTML',
+     '__html value is rendered as raw HTML by React. '
+     'Ensure it is sanitized with DOMPurify.sanitize() before use.'),
+    (re.compile(r'location\.href\s*=\s*\w'), 'medium',
+     'Open redirect via location.href',
+     'Setting location.href with user-controlled input enables open redirect attacks. '
+     'Validate the URL against an allowlist before redirecting.'),
+    (re.compile(r'postMessage\s*\([^,]+,\s*["\*]'), 'low',
+     'postMessage with wildcard or unvalidated origin',
+     'Using "*" as targetOrigin in postMessage leaks data to any listening frame. '
+     'Always specify the exact target origin.'),
+]
+
+# Python-specific patterns
+_PY_PATTERNS: list[tuple] = [
+    (re.compile(r'\bexec\s*\('), 'high',
+     'exec() — arbitrary code execution',
+     'exec() evaluates arbitrary Python code strings. Never use with user-controlled input.'),
+    (re.compile(r'\beval\s*\('), 'high',
+     'eval() — arbitrary code execution',
+     'eval() evaluates arbitrary Python expressions. Never use with user-controlled input.'),
+    (re.compile(r'\bos\.system\s*\('), 'high',
+     'os.system() — shell command injection',
+     'os.system() passes the string directly to the shell. '
+     'Use subprocess.run([...], shell=False) with a list to prevent injection.'),
+    (re.compile(r'subprocess\.[a-zA-Z]+\s*\([^)]*shell\s*=\s*True'), 'high',
+     'subprocess with shell=True — command injection',
+     'shell=True allows shell metacharacters to be injected. '
+     'Pass a list of arguments and use shell=False (the default).'),
+    (re.compile(r'\bpickle\.loads?\s*\('), 'high',
+     'Insecure pickle deserialization',
+     'pickle.load(s) with untrusted data allows arbitrary code execution. '
+     'Use JSON, MessagePack, or another safe serialization format.'),
+    (re.compile(r'\byaml\.load\s*\((?![^)]*Loader\s*=\s*yaml\.SafeLoader)'), 'medium',
+     'Unsafe yaml.load() — arbitrary code execution',
+     'yaml.load() without SafeLoader can execute arbitrary Python. '
+     'Replace with yaml.safe_load() or pass Loader=yaml.SafeLoader explicitly.'),
+    (re.compile(r'\bhashlib\.(md5|sha1)\s*\('), 'medium',
+     'Weak hash algorithm (MD5/SHA-1)',
+     'MD5 and SHA-1 are cryptographically broken. '
+     'Use hashlib.sha256() or hashlib.sha3_256() for security-sensitive hashing.'),
+    (re.compile(r'\brandom\.(random|randint|choice|shuffle|randbytes)\s*\('), 'low',
+     'Insecure random — not cryptographically safe',
+     'The random module is not cryptographically secure. '
+     'Use the secrets module for tokens, passwords, or nonces.'),
+    (re.compile(r'SELECT\s+.+\s+FROM\s+.+\s*\+\s*\w|\bformat\s*\(.*SELECT'), 'high',
+     'Possible SQL injection via string concatenation',
+     'Building SQL queries with string concatenation or format() enables SQL injection. '
+     'Use parameterized queries: cursor.execute(sql, (param,))'),
+]
+
 _EXT_LANG: dict[str, str] = {
     ".py":   "python",
     ".js":   "javascript",
@@ -392,6 +518,77 @@ def _run_gitleaks(gitleaks_cmd: str, tmp_dir: str) -> tuple[list[dict], dict]:
     return findings, meta
 
 
+# ── Built-in scanner — no external tools required ────────────────────────────
+
+def _run_builtin_scan(root: Path) -> tuple[list[dict], dict]:
+    """
+    Regex-based scanner that runs regardless of whether Semgrep/Gitleaks/Bandit
+    are installed. Covers hardcoded secrets (all files), JS/JSX dangerous
+    patterns, and Python injection sinks.
+    """
+    findings: list[dict] = []
+    files_checked = 0
+
+    for fpath in root.rglob("*"):
+        if not fpath.is_file():
+            continue
+        if fpath.suffix.lower() not in _ALL_EXTS:
+            continue
+
+        try:
+            content = fpath.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+
+        if len(content) > 1_000_000:
+            content = content[:1_000_000]
+
+        files_checked += 1
+        rel_path = str(fpath.relative_to(root)).replace("\\", "/")
+        lines    = content.splitlines()
+        ext      = fpath.suffix.lower()
+
+        def _make_finding(sev: str, title: str, desc: str, category: str, m: re.Match) -> dict:
+            lineno  = content[:m.start()].count("\n") + 1
+            snippet = lines[lineno - 1].strip()[:200] if lineno <= len(lines) else ""
+            slug    = re.sub(r"[^a-z0-9]+", "_", title.lower())[:40]
+            return {
+                "check":       f"builtin_{category}_{slug}",
+                "title":       f"[Built-in] {title}",
+                "severity":    sev,
+                "description": desc,
+                "evidence":    f"{rel_path}:{lineno}\n{snippet}" if snippet else f"{rel_path}:{lineno}",
+                "remediation": desc,
+                "line_number": lineno,
+                "confidence":  3,
+                "source":      "builtin",
+            }
+
+        # Secrets — all file types
+        for _pat, _sev, _title, _desc in _SECRET_PATTERNS:
+            for m in _pat.finditer(content):
+                findings.append(_make_finding(_sev, _title, _desc, "secret", m))
+
+        # JS/TS/JSX — XSS and injection sinks
+        if ext in _JS_EXTS:
+            for _pat, _sev, _title, _desc in _JS_PATTERNS:
+                for m in _pat.finditer(content):
+                    findings.append(_make_finding(_sev, _title, _desc, "js", m))
+
+        # Python — injection and dangerous function calls
+        if ext in _PY_EXTS:
+            for _pat, _sev, _title, _desc in _PY_PATTERNS:
+                for m in _pat.finditer(content):
+                    findings.append(_make_finding(_sev, _title, _desc, "py", m))
+
+    meta = {
+        "builtin_issues":        len(findings),
+        "builtin_files_checked": files_checked,
+    }
+    logger.info("Built-in scan | files=%d issues=%d", files_checked, len(findings))
+    return findings, meta
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def run_sast_scan(file_path: str) -> dict:
@@ -499,7 +696,18 @@ def run_sast_scan(file_path: str) -> dict:
                 "https://github.com/gitleaks/gitleaks/releases"
             )
 
-        # ── 4. Run all tools concurrently ─────────────────────────────────────
+        # ── 4. Built-in scanner — always runs, no tools required ─────────────
+        try:
+            builtin_findings, builtin_meta = _run_builtin_scan(root)
+            vulns.extend(builtin_findings)
+            meta.update(builtin_meta)
+            if builtin_findings:
+                meta["tools"].append("builtin")
+        except Exception as exc:
+            logger.warning("SAST[builtin] failed: %s", exc)
+            meta["builtin_error"] = str(exc)
+
+        # ── 5. External tools — run concurrently when available ───────────────
         futures: dict = {}
         with ThreadPoolExecutor(max_workers=3, thread_name_prefix="sast") as pool:
             if bandit_cmd:
@@ -519,7 +727,7 @@ def run_sast_scan(file_path: str) -> dict:
                     logger.warning("SAST[%s] failed: %s", name, exc)
                     meta[f"{name}_error"] = str(exc)
 
-        # ── 5. Cross-tool deduplication + final count ─────────────────────────
+        # ── 6. Cross-tool deduplication + final count ─────────────────────────
         vulns = _dedup_sast(vulns)
         meta["issues_found"] = len(vulns)
 

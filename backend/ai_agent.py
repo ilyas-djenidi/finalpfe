@@ -1,20 +1,21 @@
 # ai_agent.py
 """
-ARIA — Autonomous Risk Intelligence Agent
-==========================================
-Online:  Gemini 1.5 Flash (google-genai)
-Offline: Comprehensive rule-based engine — always works, zero quota needed
+ARIA — Autonomous Risk Intelligence Agent  v2
+=============================================
+Provider priority:  Ollama → Gemini 2.0 Flash → Offline rule-engine
+Offline mode always works — zero external dependencies required.
 
 External APIs:
-  • NVD API v2  — real-time CVE lookup     (optional key: NVD_API_KEY)
-  • OSV.dev     — open source vuln lookup  (free, no key)
-  • MITRE ATT&CK — offline technique mapping
+  • Google Gemini 2.0 Flash  (GEMINI_API_KEY)
+  • Ollama local LLM          (OLLAMA_URL + OLLAMA_MODEL)
+  • NVD API v2                (optional NVD_API_KEY for higher rate limits)
 """
 
 import json
 import logging
 import os
 import re
+import threading
 from datetime import datetime
 from typing import Optional
 
@@ -22,25 +23,51 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# ── Gemini init ───────────────────────────────────────────────────────────────
-_GENAI_AVAILABLE = False
-_genai_client    = None
-try:
-    from google import genai as _genai_mod
-    _api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if _api_key:
-        _genai_client    = _genai_mod.Client(api_key=_api_key)
-        _GENAI_AVAILABLE = True
-except Exception:
-    pass
+# ── Environment ───────────────────────────────────────────────────────────────
+_GEMINI_KEY   = os.environ.get("GEMINI_API_KEY",  "").strip()
+_NVD_KEY      = os.environ.get("NVD_API_KEY",     "").strip()
+_OLLAMA_URL   = os.environ.get("OLLAMA_URL",      "").strip()
+_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL",    "mistral").strip()
+_NVD_BASE     = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
-_NVD_KEY  = os.environ.get("NVD_API_KEY", "").strip()
-_NVD_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+# ── Gemini init ───────────────────────────────────────────────────────────────
+_genai_client = None
+try:
+    if _GEMINI_KEY:
+        from google import genai as _genai_mod
+        _genai_client = _genai_mod.Client(api_key=_GEMINI_KEY)
+        logger.info("ARIA: Gemini 2.0 Flash client initialised")
+except Exception as _e:
+    logger.warning("ARIA: Gemini init failed (%s)", _e)
+
+# ── ARIA system prompt ────────────────────────────────────────────────────────
+_SYSTEM_PROMPT = """\
+You are ARIA (Autonomous Risk Intelligence Agent), the AI core of CyBrain — a professional cybersecurity analysis platform.
+
+## Identity & role
+You are a senior cybersecurity analyst with deep expertise in vulnerability assessment (CVSS v3.1, CVE, CWE), threat intelligence (MITRE ATT&CK, OWASP Top 10 2025), penetration testing (PTES, OSSTMM), and compliance frameworks (GDPR, PCI-DSS 4.0, ISO 27001, NIS2, HIPAA).
+
+## Behavior rules
+1. Always respond in the same language the user writes in. If the message is in Arabic, respond fully in Arabic. If English, respond in English.
+2. Be direct, precise, and technical. No filler phrases.
+3. When analyzing findings, always structure your response as: Severity assessment → Root cause → Real-world attack scenario → Remediation steps (ordered by priority) → CVE/CWE/OWASP reference.
+4. When asked about a CVE, always include: CVSS score, affected versions, exploit status, and patch.
+5. Never guess or fabricate CVE numbers, CVSS scores, or technical details. If uncertain, say so.
+6. For compliance questions, map findings to specific control requirements with control IDs.
+7. When multiple vulnerabilities are present, identify attack chains — combinations that create higher impact than individual findings alone.
+8. For code review requests, always provide a before/after code block with the fix.
+
+## Output format
+Use markdown. For structured analysis use headers and bullet points. For code fixes use fenced code blocks with language specified. Keep responses concise unless the user asks for a detailed report.
+
+## Constraints
+You do not execute code or access external systems. You analyze data provided by CyBrain scanning engines. Never fabricate data. If a request is outside cybersecurity scope, politely redirect.\
+"""
 
 # ── Severity weights ──────────────────────────────────────────────────────────
 _SEV_WEIGHT = {"critical": 10, "high": 7, "medium": 4, "low": 1, "info": 0}
 
-# ── Comprehensive offline knowledge base ─────────────────────────────────────
+# ── Offline knowledge base ────────────────────────────────────────────────────
 _KB: dict[str, dict] = {
     "sql injection": {
         "cve": "CVE-2023-23397", "cwe": "CWE-89", "cvss": 9.8,
@@ -72,6 +99,7 @@ _KB: dict[str, dict] = {
             "**Python:** `from markupsafe import escape; safe = escape(user_input)`\n"
             "**JS:** use `textContent` not `innerHTML`\n"
             "**PHP:** `htmlspecialchars($input, ENT_QUOTES, 'UTF-8')`\n"
+            "**React:** avoid `dangerouslySetInnerHTML`; use `DOMPurify.sanitize()` if HTML is needed\n"
             "**CSP:** `Content-Security-Policy: default-src 'self'`"
         ),
         "tools": "OWASP ZAP, Burp Suite, XSStrike",
@@ -96,7 +124,8 @@ _KB: dict[str, dict] = {
         "attack": "Request to `?file=../../../../etc/passwd` reads sensitive system files.",
         "impact": "Source code, configuration files, /etc/passwd, private keys exposed.",
         "fix": (
-            "```python\nimport os\nsafe = os.path.basename(user_input)\nreal = os.path.realpath(os.path.join(BASE, safe))\n"
+            "```python\nimport os\nsafe = os.path.basename(user_input)\n"
+            "real = os.path.realpath(os.path.join(BASE, safe))\n"
             "assert real.startswith(BASE), 'Path traversal detected'\n```"
         ),
         "tools": "Burp Suite, dirb",
@@ -105,7 +134,7 @@ _KB: dict[str, dict] = {
         "cve": "CWE-798", "cwe": "CWE-798", "cvss": 9.1,
         "owasp": "A07:2025 Authentication Failures",
         "mitre": "T1552.001 Credentials In Files",
-        "attack": "Developer commits `password = 'SuperSecret123'` to GitHub. Attacker finds it via `git log` or GitHub search.",
+        "attack": "Developer commits `password = 'SuperSecret123'` to GitHub. Attacker finds it via git log or GitHub search.",
         "impact": "Full database access, API key abuse, account takeover.",
         "fix": (
             "```python\nimport os\nDB_PASS = os.environ.get('DB_PASSWORD')  # from .env\n```\n"
@@ -215,11 +244,11 @@ _KB: dict[str, dict] = {
         "attack": "No rate limiting on login → attacker runs credential stuffing with 100M leaked passwords.",
         "impact": "Mass account takeover.",
         "fix": (
-            "• Implement rate limiting: Flask-Limiter `@limiter.limit('10/minute')`\n"
+            "• Rate limiting: `@limiter.limit('10/minute')`\n"
             "• Account lockout after 5 failed attempts\n"
             "• Require MFA for sensitive actions\n"
-            "• Use bcrypt/argon2 for password hashing (never MD5/SHA1)\n"
-            "• Implement CAPTCHA after 3 failures"
+            "• Use bcrypt/argon2 (never MD5/SHA1)\n"
+            "• CAPTCHA after 3 failures"
         ),
         "tools": "Hydra, Burp Suite Intruder",
     },
@@ -239,7 +268,7 @@ _KB: dict[str, dict] = {
     },
 }
 
-# ── MITRE ATT&CK technique mapping ───────────────────────────────────────────
+# ── MITRE ATT&CK mapping ──────────────────────────────────────────────────────
 _MITRE_MAP: dict[str, dict] = {
     "rce":                    {"tactic": "Execution",          "technique_id": "T1059",     "technique": "Command and Scripting Interpreter"},
     "remote code":            {"tactic": "Execution",          "technique_id": "T1059",     "technique": "Command and Scripting Interpreter"},
@@ -269,7 +298,7 @@ _MITRE_MAP: dict[str, dict] = {
 }
 _MITRE_BASE = "https://attack.mitre.org/techniques/"
 
-# ── OWASP Top 10 2025 reference ───────────────────────────────────────────────
+# ── OWASP Top 10 2025 ─────────────────────────────────────────────────────────
 _OWASP_TOP10 = """## OWASP Top 10 — 2025
 
 | # | Category | Risk | Key Vulns |
@@ -287,7 +316,7 @@ _OWASP_TOP10 = """## OWASP Top 10 — 2025
 
 Source: https://owasp.org/Top10/"""
 
-# ── CVSS scoring guide ────────────────────────────────────────────────────────
+# ── CVSS guide ────────────────────────────────────────────────────────────────
 _CVSS_GUIDE = """## CVSS v3.1 Severity Levels
 
 | Score | Severity | Action Required |
@@ -306,41 +335,96 @@ _CVSS_GUIDE = """## CVSS v3.1 Severity Levels
 - **C/I/A: H** — High impact on Confidentiality/Integrity/Availability"""
 
 
+def _is_arabic(text: str) -> bool:
+    """Return True if the text contains Arabic Unicode characters."""
+    return bool(re.search(r"[؀-ۿ]", text))
+
+
 class ARIA:
-    """Autonomous Risk Intelligence Agent — Gemini online + full offline fallback."""
+    """Autonomous Risk Intelligence Agent — Ollama → Gemini → Offline fallback."""
+
+    _HISTORY_LIMIT = 20
 
     def __init__(self):
-        self.ai_active    = False
-        self.chat_history: list[dict] = []
+        self.ai_active = False
+        self.provider  = "offline"
+        # Per-user conversation history: { user_id -> [{"q": ..., "a": ...}, ...] }
+        self._chat_histories: dict[str, list[dict]] = {}
 
-        if _GENAI_AVAILABLE and _genai_client:
-            try:
-                self.ai_active = True
-                logger.info("ARIA online — Gemini 1.5 Flash")
-            except Exception as exc:
-                logger.warning("ARIA: Gemini init failed (%s) — offline mode", exc)
+        if _OLLAMA_URL:
+            self.provider  = "ollama"
+            self.ai_active = True
+            logger.info("ARIA online — Ollama at %s (model: %s)", _OLLAMA_URL, _OLLAMA_MODEL)
+        elif _genai_client:
+            self.provider  = "gemini"
+            self.ai_active = True
+            logger.info("ARIA online — Gemini 2.0 Flash")
         else:
-            logger.info("ARIA offline — set GEMINI_API_KEY to enable online mode")
+            logger.info("ARIA offline — set GEMINI_API_KEY or OLLAMA_URL to enable AI")
 
-    # ── Gemini ────────────────────────────────────────────────────────────────
+    # ── History helpers ───────────────────────────────────────────────────────
+
+    def _get_history(self, user_id: str) -> list[dict]:
+        if user_id not in self._chat_histories:
+            self._chat_histories[user_id] = []
+        return self._chat_histories[user_id]
+
+    def clear_history(self, user_id: str) -> None:
+        """Erase conversation history for a specific user."""
+        self._chat_histories.pop(str(user_id), None)
+
+    # ── Provider calls ────────────────────────────────────────────────────────
 
     def _gemini(self, prompt: str, system: str = "") -> Optional[str]:
-        if not self.ai_active or not _genai_client:
+        if not _genai_client:
             return None
         try:
             full = f"{system}\n\n{prompt}" if system else prompt
             resp = _genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents=full
+                model="gemini-2.0-flash",
+                contents=full,
+                config={"timeout": 30},
             )
             return resp.text
         except Exception as exc:
-            logger.warning("ARIA Gemini failed: %s", exc)
+            logger.warning("ARIA Gemini error: %s", exc)
             return None
+
+    def _ollama(self, prompt: str, system: str = "") -> Optional[str]:
+        if not _OLLAMA_URL:
+            return None
+        try:
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+            r = requests.post(
+                _OLLAMA_URL.rstrip("/") + "/api/chat",
+                json={"model": _OLLAMA_MODEL, "messages": messages, "stream": False},
+                timeout=60,
+            )
+            r.raise_for_status()
+            return r.json().get("message", {}).get("content", "")
+        except Exception as exc:
+            logger.warning("ARIA Ollama error: %s", exc)
+            return None
+
+    def _ai_call(self, prompt: str, system: str = "") -> Optional[str]:
+        """Call the highest-priority available AI provider."""
+        if self.provider == "ollama":
+            result = self._ollama(prompt, system)
+            if result:
+                return result
+            # Fall through to Gemini if Ollama fails
+            if _genai_client:
+                return self._gemini(prompt, system)
+        elif self.provider == "gemini":
+            return self._gemini(prompt, system)
+        return None
 
     # ── NVD CVE lookup ────────────────────────────────────────────────────────
 
     def lookup_cve(self, cve_id: str) -> dict:
-        """Real-time NVD API v2 lookup for a CVE ID."""
         headers = {"apiKey": _NVD_KEY} if _NVD_KEY else {}
         try:
             r = requests.get(_NVD_BASE, params={"cveId": cve_id}, headers=headers, timeout=8)
@@ -368,21 +452,22 @@ class ARIA:
 
     # ── Chat ──────────────────────────────────────────────────────────────────
 
-    def chat(self, message: str, context: Optional[dict] = None) -> str:
-        """Cybersecurity Q&A. Gemini first, comprehensive offline fallback."""
-        ctx = context or {}
+    def chat(self, message: str, context: Optional[dict] = None,
+             user_id: str = "anonymous") -> str:
+        ctx          = context or {}
+        user_history = self._get_history(str(user_id))
+        arabic       = _is_arabic(message)
 
         if self.ai_active:
-            system = (
-                "You are ARIA, an expert cybersecurity AI assistant for the CyBrain security platform. "
-                "Answer questions about web security, network security, OWASP Top 10 2025, "
-                "CVEs, exploit techniques, secure coding, and vulnerability remediation. "
-                "Always provide: attack explanation, real-world impact, and concrete code fix examples. "
-                "Format responses in Markdown with code blocks. Be technical and precise."
-            )
+            # Extend system prompt with language instruction
+            system = _SYSTEM_PROMPT
+            if arabic:
+                system += "\n\nRespond entirely in Arabic. Use correct Arabic cybersecurity terminology."
+
+            # Build history context (last 20 exchanges)
             history = "".join(
                 f"User: {t['q']}\nARIA: {t['a']}\n\n"
-                for t in self.chat_history[-4:]
+                for t in user_history[-self._HISTORY_LIMIT:]
             )
             ctx_note = ""
             if ctx:
@@ -390,16 +475,22 @@ class ARIA:
                     f"\n\nActive scan context — target: {ctx.get('target','N/A')} | "
                     f"risk: {ctx.get('risk','N/A')} | findings: {ctx.get('total',0)}"
                 )
-            result = self._gemini(f"{history}User: {message}{ctx_note}", system=system)
+            result = self._ai_call(f"{history}User: {message}{ctx_note}", system=system)
             if result:
-                self.chat_history.append({"q": message, "a": result})
+                user_history.append({"q": message, "a": result})
+                # Trim history to limit
+                if len(user_history) > self._HISTORY_LIMIT:
+                    self._chat_histories[str(user_id)] = user_history[-self._HISTORY_LIMIT:]
                 return result
 
-        reply = self._offline(message.lower(), ctx)
-        self.chat_history.append({"q": message, "a": reply})
+        # Offline fallback
+        reply = self._offline(message.lower(), ctx, arabic=arabic)
+        user_history.append({"q": message, "a": reply})
+        if len(user_history) > self._HISTORY_LIMIT:
+            self._chat_histories[str(user_id)] = user_history[-self._HISTORY_LIMIT:]
         return reply
 
-    def _offline(self, msg: str, ctx: dict) -> str:
+    def _offline(self, msg: str, ctx: dict, arabic: bool = False) -> str:
         # CVE lookup
         cve_match = re.search(r"cve-(\d{4}-\d+)", msg, re.IGNORECASE)
         if cve_match:
@@ -419,82 +510,55 @@ class ARIA:
             return f"No NVD data found for {cve_id}. Check https://nvd.nist.gov/vuln/detail/{cve_id}"
 
         # Scan context explanation
-        if ctx and any(k in msg for k in ["explain", "finding", "result", "scan", "vuln", "found", "what"]):
+        if ctx and any(k in msg for k in ["explain", "finding", "result", "scan", "vuln", "found", "what",
+                                           "اشرح", "نتائج", "نتيجة", "فحص", "ثغرة"]):
             return self._explain_context(ctx)
 
-        # Knowledge base lookup
+        # Knowledge base
         for key, kb in _KB.items():
             if key in msg or key.replace(" ", "") in msg.replace(" ", ""):
                 return self._kb_response(key, kb)
 
-        # OWASP
         if "owasp" in msg:
             return _OWASP_TOP10
-
-        # CVSS
         if any(k in msg for k in ["cvss", "severity", "score", "critical", "rating"]):
             return _CVSS_GUIDE
-
-        # Headers
         if any(k in msg for k in ["header", "hsts", "csp", "x-frame", "cors", "security header"]):
             return _KB["missing security headers"]["fix"] + "\n\n**Test:** https://securityheaders.com"
-
-        # SSL/TLS
         if any(k in msg for k in ["ssl", "tls", "https", "certificate", "cipher"]):
             return _KB["ssl"]["fix"]
-
-        # Apache hardening
         if any(k in msg for k in ["apache", "httpd", "nginx", "server config"]):
             return (
                 "## Server Hardening\n\n"
-                "```apache\n"
-                "# Apache\nServerTokens Prod\nServerSignature Off\n"
+                "```apache\n# Apache\nServerTokens Prod\nServerSignature Off\n"
                 "Options -Indexes -ExecCGI\nTraceEnable Off\n"
-                "SSLProtocol -all +TLSv1.2 +TLSv1.3\n"
-                "LimitRequestBody 10485760\n"
+                "SSLProtocol -all +TLSv1.2 +TLSv1.3\nLimitRequestBody 10485760\n"
                 "Header always set X-Frame-Options DENY\n"
-                "Header always set X-Content-Type-Options nosniff\n"
-                "```\n\n"
-                "```nginx\n"
-                "# Nginx\nserver_tokens off;\n"
-                "add_header X-Frame-Options DENY;\n"
-                "add_header X-Content-Type-Options nosniff;\n"
-                "ssl_protocols TLSv1.2 TLSv1.3;\n"
-                "ssl_prefer_server_ciphers on;\n"
-                "```"
+                "Header always set X-Content-Type-Options nosniff\n```\n\n"
+                "```nginx\n# Nginx\nserver_tokens off;\n"
+                "add_header X-Frame-Options DENY;\nadd_header X-Content-Type-Options nosniff;\n"
+                "ssl_protocols TLSv1.2 TLSv1.3;\nssl_prefer_server_ciphers on;\n```"
             )
-
-        # Authentication
         if any(k in msg for k in ["auth", "login", "password", "session", "mfa", "totp", "2fa"]):
             return _KB["broken authentication"]["fix"]
-
-        # Tools list
         if any(k in msg for k in ["tool", "zap", "nikto", "nmap", "burp", "scanner"]):
             return (
                 "## CyBrain Integrated Security Tools\n\n"
-                "| Tool | Type | Purpose | Install |\n"
-                "|------|------|---------|--------|\n"
-                "| **OWASP ZAP** | DAST | Active web scanning | Free: zaproxy.org |\n"
-                "| **Nikto** | DAST | Web server scanner | `apt install nikto` |\n"
-                "| **Nmap** | Network | Port scan + NSE vulns | nmap.org |\n"
-                "| **Bandit** | SAST | Python code analysis | `pip install bandit` |\n"
-                "| **Semgrep** | SAST | Multi-language analysis | `pip install semgrep` |\n"
-                "| **pip-audit** | Deps | Python vulnerability scan | `pip install pip-audit` |\n"
-                "| **npm audit** | Deps | Node.js vuln scan | bundled with npm |\n\n"
-                "**External APIs (free):**\n"
-                "- SSL Labs — full TLS grade\n"
-                "- Mozilla Observatory — header analysis\n"
-                "- Shodan InternetDB — IP intelligence\n"
-                "- OSV.dev — open source vuln DB\n"
-                "- NVD API — CVE details"
+                "| Tool | Type | Purpose |\n|------|------|--------|\n"
+                "| **OWASP ZAP** | DAST | Active web scanning |\n"
+                "| **Nikto** | DAST | Web server misconfigs |\n"
+                "| **Nmap** | Network | Port scan + NSE vulns |\n"
+                "| **Bandit** | SAST | Python code analysis |\n"
+                "| **Semgrep** | SAST | Multi-language analysis |\n"
+                "| **Gitleaks** | Secrets | 150+ secret types |\n"
+                "| **pip-audit** | Deps | Python CVE scan |\n"
+                "| **npm audit** | Deps | Node.js CVE scan |\n\n"
+                "**Free APIs:** SSL Labs · Mozilla Observatory · Shodan InternetDB · OSV.dev · NVD"
             )
-
-        # Network security
         if any(k in msg for k in ["port", "network", "firewall", "smb", "rdp", "ssh"]):
             return (
                 "## Network Security — Critical Ports\n\n"
-                "| Port | Service | Risk | Action |\n"
-                "|------|---------|------|--------|\n"
+                "| Port | Service | Risk | Action |\n|------|---------|------|--------|\n"
                 "| 22 | SSH | HIGH | Key auth only, disable password auth |\n"
                 "| 23 | Telnet | CRITICAL | Disable — use SSH |\n"
                 "| 3389 | RDP | HIGH | VPN-only, enable NLA |\n"
@@ -502,19 +566,15 @@ class ARIA:
                 "| 6379 | Redis | CRITICAL | requirepass + bind 127.0.0.1 |\n"
                 "| 27017 | MongoDB | CRITICAL | Enable --auth |\n"
                 "| 445 | SMB | CRITICAL | Patch EternalBlue (MS17-010) |\n"
-                "| 5432 | PostgreSQL | HIGH | Restrict pg_hba.conf |\n"
                 "| 9200 | Elasticsearch | CRITICAL | Enable X-Pack security |"
             )
-
-        # Report / explain
         if any(k in msg for k in ["report", "explain", "summary", "remediat"]):
             return self._explain_context(ctx) if ctx else (
                 "Share scan results first (run a scan), then ask me to explain the findings."
             )
 
-        # General help
         return (
-            "## ARIA Security Assistant — Offline Mode\n\n"
+            "## ARIA Security Assistant\n\n"
             "I can help with:\n\n"
             "**Vulnerabilities (full attack + fix):**\n"
             "- SQL Injection, XSS, Command Injection, Path Traversal\n"
@@ -525,12 +585,8 @@ class ARIA:
             "- `owasp` — OWASP Top 10 2025\n"
             "- `cvss` — Severity scoring guide\n"
             "- `CVE-YYYY-NNNNN` — Real-time NVD CVE lookup\n\n"
-            "**Configuration:**\n"
-            "- `apache hardening`, `nginx config`\n"
-            "- `ssl tls`, `security headers`\n"
-            "- `authentication`, `mfa`\n\n"
-            "**Tools:**\n"
-            "- `tools list` — all integrated security tools\n\n"
+            "**Configuration:** `apache hardening`, `ssl tls`, `security headers`\n\n"
+            "**Tools:** `tools list` — all integrated security tools\n\n"
             "Ask me anything about security!"
         )
 
@@ -588,7 +644,11 @@ class ARIA:
         for f in sorted(findings, key=lambda f: order.get((f.get("severity") or "info").lower(), 5)):
             sev        = (f.get("severity") or "info").lower()
             label      = (f.get("title") or f.get("check") or "")[:60]
-            check_text = (f.get("check","") + " " + (f.get("title","")) + " " + f.get("description","")).lower()
+            check_text = (
+                (f.get("check", "") or "") + " " +
+                (f.get("title",  "") or "") + " " +
+                (f.get("description", "") or "")
+            ).lower()
             for kw, mtr in _MITRE_MAP.items():
                 if kw in check_text:
                     tid = mtr["technique_id"]
@@ -622,8 +682,8 @@ class ARIA:
                 "status": "❌ FAIL" if (crit or high) else ("⚠ REVIEW" if med else "✓ PASS"),
                 "color":  "critical" if crit else ("high" if (high or med) else "low"),
                 "note":   "Req 6.3.3: All critical/high vulns must be remediated immediately." if (crit or high)
-                          else ("Req 6.3.2: Remediate medium findings within next release." if med
-                                else "PCI-DSS vulnerability requirements appear satisfied."),
+                          else ("Req 6.3.2: Remediate medium findings in next release." if med
+                                else "PCI-DSS requirements appear satisfied."),
             },
             "iso_27001": {
                 "status": "❌ NON-CONFORMITY" if high else ("⚠ MINOR GAPS" if med else "✓ CONFORMANT"),
@@ -653,7 +713,6 @@ class ARIA:
                 enriched[cve_id] = {
                     "cvss_score":  data.get("cvss_score"),
                     "severity":    (data.get("severity") or "").upper(),
-                    "cwes":        [],
                     "description": data.get("description", ""),
                     "nvd_url":     f"https://nvd.nist.gov/vuln/detail/{cve_id}",
                 }
@@ -662,40 +721,39 @@ class ARIA:
     # ── Findings analysis ─────────────────────────────────────────────────────
 
     def analyze_findings(self, findings: list, target: str, scan_type: str = "web") -> dict:
-        """Return structured analysis dict for the ARIA report panel tabs."""
         counts = {s: sum(1 for f in findings if (f.get("severity") or "info").lower() == s)
                   for s in ("critical", "high", "medium", "low", "info")}
 
-        # Always computed deterministically — never delegated to LLM
         mitre_mappings = self._build_mitre_mappings(findings)
         nvd_enriched   = self._build_nvd_enriched(findings)
         compliance     = self._build_compliance(counts)
 
         if not findings:
             return {
-                "aria_mode": "online" if self.ai_active else "offline",
-                "attack_chain": "## No Findings\n\nScan completed — zero vulnerabilities detected.",
+                "aria_mode":      "online" if self.ai_active else "offline",
+                "provider":       self.provider,
+                "attack_chain":   "## No Findings\n\nScan completed — zero vulnerabilities detected.",
                 "mitre_mappings": [], "remediation_md": None,
                 "remediation_steps": [], "compliance": compliance, "nvd_enriched": {},
             }
+
+        sys_prompt = (
+            "You are ARIA, a senior penetration tester. Be technical, precise, and action-oriented. "
+            "Format responses as professional Markdown with code blocks."
+        )
+        payload = json.dumps(findings[:15], indent=2, ensure_ascii=False)[:4000]
 
         attack_chain   = None
         remediation_md = None
 
         if self.ai_active:
-            sys_prompt = (
-                "You are ARIA, a senior penetration tester. Be technical, precise, and action-oriented. "
-                "Format responses as professional Markdown with code blocks."
-            )
-            payload = json.dumps(findings[:15], indent=2, ensure_ascii=False)[:4000]
-
-            attack_chain = self._gemini(
+            attack_chain = self._ai_call(
                 f"Target: {target} | Scan: {scan_type}\nFindings ({len(findings)} total):\n{payload}\n\n"
                 "Write a realistic step-by-step attack chain narrative: how would an attacker chain "
                 "these vulnerabilities? Include entry points, lateral movement, and impact.",
                 system=sys_prompt,
             )
-            remediation_md = self._gemini(
+            remediation_md = self._ai_call(
                 f"Based on these {len(findings)} security findings:\n{payload}\n\n"
                 "Write prioritized remediation steps with specific code examples. "
                 "Group by: ## Priority 1 — CRITICAL, ## Priority 2 — HIGH, etc.",
@@ -709,6 +767,7 @@ class ARIA:
 
         return {
             "aria_mode":         "online" if self.ai_active else "offline",
+            "provider":          self.provider,
             "attack_chain":      attack_chain,
             "mitre_mappings":    mitre_mappings,
             "remediation_md":    remediation_md,
@@ -716,6 +775,37 @@ class ARIA:
             "compliance":        compliance,
             "nvd_enriched":      nvd_enriched,
         }
+
+    def generate_fix(self, vuln_type: str, context: str = "") -> str:
+        """Generate a specific code fix for a vulnerability type."""
+        if self.ai_active:
+            system = _SYSTEM_PROMPT
+            prompt = (
+                f"Generate a concrete, production-ready code fix for: **{vuln_type}**\n\n"
+                f"Context:\n{context[:1000]}\n\n"
+                "Provide:\n1. The vulnerable code pattern (before)\n2. The fixed code (after)\n"
+                "3. Why the fix works\n4. Any additional hardening steps"
+            )
+            result = self._ai_call(prompt, system=system)
+            if result:
+                return result
+
+        # Offline KB lookup
+        key = vuln_type.lower().strip()
+        for kb_key, kb in _KB.items():
+            if kb_key in key or key in kb_key:
+                return (
+                    f"## Fix for {vuln_type}\n\n"
+                    f"**CWE:** {kb.get('cwe','N/A')} | **OWASP:** {kb.get('owasp','N/A')}\n\n"
+                    f"### Remediation\n{kb.get('fix','See documentation.')}\n\n"
+                    f"**Tools to verify fix:** {kb.get('tools','Manual review')}"
+                )
+        return (
+            f"## Fix for {vuln_type}\n\n"
+            "No specific offline fix available for this vulnerability type. "
+            "Refer to OWASP guidelines and the specific CVE/CWE documentation.\n\n"
+            "Enable GEMINI_API_KEY or OLLAMA_URL for AI-powered fix generation."
+        )
 
     def _offline_attack_chain(self, findings: list, target: str, scan_type: str, counts: dict) -> str:
         risk = next((s for s in ("critical","high","medium","low") if counts.get(s,0)>0), "info")
@@ -760,10 +850,8 @@ class ARIA:
         if not impacts:
             impacts.append("- **Security Degradation** — Multiple misconfigurations compound overall risk")
 
-        lines += ["## Impact Assessment", ""] + impacts + [
-            "",
-            "*Set `GEMINI_API_KEY` for AI-powered personalized attack chain analysis.*",
-        ]
+        lines += ["## Impact Assessment", ""] + impacts + ["",
+            "*Enable GEMINI_API_KEY or OLLAMA_URL for AI-powered personalized analysis.*"]
         return "\n".join(lines)
 
     def _offline_remediation(self, findings: list, counts: dict) -> str:
@@ -811,15 +899,14 @@ class ARIA:
 
 
 # ── Singleton (thread-safe for Gunicorn multi-worker) ─────────────────────────
-import threading as _threading
 _aria: Optional[ARIA] = None
-_aria_lock = _threading.Lock()
+_aria_lock = threading.Lock()
 
 
 def get_aria() -> ARIA:
     global _aria
     if _aria is None:
         with _aria_lock:
-            if _aria is None:   # double-checked locking
+            if _aria is None:
                 _aria = ARIA()
     return _aria

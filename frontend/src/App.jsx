@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, useAuth, ToastContainer } from './context/AuthContext';
 
 // Layout & Components
 import Layout from './components/Layout';
@@ -21,9 +21,11 @@ import DependencyScanPage from './pages/DependencyScanPage';
 import ReportPage       from './pages/ReportPage';
 
 // Admin Pages
-import AdminUsersPage from './pages/AdminUsersPage';
-import AdminScansPage from './pages/AdminScansPage';
-import AuditLogPage   from './pages/AuditLogPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminUsersPage     from './pages/AdminUsersPage';
+import AdminScansPage     from './pages/AdminScansPage';
+import AuditLogPage       from './pages/AuditLogPage';
+import ChatPage           from './pages/ChatPage';
 
 
 // ── Error Boundary ─────────────────────────────────────────────────────────
@@ -114,6 +116,7 @@ function AppInner() {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-inter text-slate-900 dark:text-slate-50 transition-colors duration-300">
+            <ToastContainer />
             <Routes>
                 {/* Public */}
                 <Route path="/"         element={<Navigate to="/dashboard" replace />} />
@@ -145,9 +148,13 @@ function AppInner() {
                 <Route path="/dashboard"         element={<ProtectedRoute element={<DashboardPage />} />} />
 
                 {/* Admin */}
-                <Route path="/admin"             element={<ProtectedRoute element={<AdminScansPage />} adminOnly />} />
-                <Route path="/admin/users"       element={<ProtectedRoute element={<AdminUsersPage />} adminOnly />} />
-                <Route path="/audit"             element={<ProtectedRoute element={<AuditLogPage />}   adminOnly />} />
+                <Route path="/admin"             element={<ProtectedRoute element={<AdminDashboardPage />} adminOnly />} />
+                <Route path="/admin/users"       element={<ProtectedRoute element={<AdminUsersPage />}     adminOnly />} />
+                <Route path="/admin/scans"       element={<ProtectedRoute element={<AdminScansPage />}     adminOnly />} />
+                <Route path="/audit"             element={<ProtectedRoute element={<AuditLogPage />}       adminOnly />} />
+
+                {/* AI Chat */}
+                <Route path="/chat"              element={<ProtectedRoute element={<ChatPage />} />} />
 
                 {/* 404 */}
                 <Route path="*" element={<NotFoundPage />} />
