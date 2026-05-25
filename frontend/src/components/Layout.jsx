@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 
 const Layout = ({ children }) => {
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 flex flex-col">
+        <div className="h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 flex flex-col overflow-hidden">
             {/* Top Navbar */}
             <Navbar />
 

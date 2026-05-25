@@ -88,7 +88,7 @@ const NetworkScanPage = () => {
                         Network Recon
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm max-w-2xl">
-                        CyBrain high-speed active reconnaissance — discover open ports, services, and OS signatures.
+                        securAX high-speed active reconnaissance — discover open ports, services, and OS signatures.
                     </p>
                 </div>
             </div>

@@ -32,7 +32,7 @@ function downloadBlob(content, filename, mime = 'text/plain') {
 function buildJsonReport(results, scanMode, target, fileName) {
     return JSON.stringify({
         report: {
-            tool: 'CyBrain Security Platform',
+            tool: 'securAX Security Platform',
             scan_type: scanMode === 'file' ? 'Internal Config Audit (White-Box)' : scanMode === 'full' ? 'External Deep Audit' : 'Security Headers Audit',
             target: scanMode === 'file' ? fileName : target,
             generated_at: new Date().toISOString(),

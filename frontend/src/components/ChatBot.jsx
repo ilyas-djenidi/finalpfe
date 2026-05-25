@@ -143,7 +143,7 @@ const ChatBot = ({ context = null, position = 'fixed', scanFindings = null }) =>
   const [messages, setMessages] = useState([{
     role: 'assistant',
     content: (
-      '👋 Hello! I\'m **ARIA** — CyBrain\'s AI security expert.\n\n' +
+      '👋 Hello! I\'m **ARIA** — securAX\'s AI security expert.\n\n' +
       'I can help you:\n' +
       '• Understand vulnerabilities from your scans\n' +
       '• Explain attack techniques & real-world impact\n' +
@@ -273,7 +273,7 @@ const ChatBot = ({ context = null, position = 'fixed', scanFindings = null }) =>
         <div>
           <p className="font-orbitron text-white text-[11px] font-bold tracking-widest">ARIA</p>
           <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-[9px] text-gray-500 font-inter">CyBrain AI Security Expert</p>
+            <p className="text-[9px] text-gray-500 font-inter">securAX AI Security Expert</p>
             {currentProvider && <AiBadge provider={currentProvider} />}
           </div>
         </div>

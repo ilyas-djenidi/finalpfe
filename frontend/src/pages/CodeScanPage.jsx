@@ -137,8 +137,6 @@ const CodeScanPage = () => {
                         <div className="mb-6 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 space-y-1">
                             <p className="font-semibold text-slate-600 dark:text-slate-300 mb-2">Supported languages</p>
                             <p>Python · JavaScript/TypeScript · Go · Ruby · Java · C/C++ · PHP · C#</p>
-                            <p className="mt-2 font-semibold text-slate-600 dark:text-slate-300">Engines</p>
-                            <p>Vulnerability patterns · OWASP Top 10 rules · Secret detection</p>
                         </div>
 
                         <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/50">

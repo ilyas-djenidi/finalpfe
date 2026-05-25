@@ -21,7 +21,6 @@ import DependencyScanPage from './pages/DependencyScanPage';
 import ReportPage       from './pages/ReportPage';
 
 // Admin Pages
-import AdminDashboardPage from './pages/AdminDashboardPage';
 import AdminUsersPage     from './pages/AdminUsersPage';
 import AdminScansPage     from './pages/AdminScansPage';
 import AuditLogPage       from './pages/AuditLogPage';
@@ -161,7 +160,7 @@ function AppInner() {
                 <Route path="/dashboard"         element={<ProtectedRoute element={<DashboardPage />} />} />
 
                 {/* Admin */}
-                <Route path="/admin"             element={<ProtectedRoute element={<AdminDashboardPage />} adminOnly />} />
+                <Route path="/admin"             element={<Navigate to="/dashboard" replace />} />
                 <Route path="/admin/users"       element={<ProtectedRoute element={<AdminUsersPage />}     adminOnly />} />
                 <Route path="/admin/scans"       element={<ProtectedRoute element={<AdminScansPage />}     adminOnly />} />
                 <Route path="/audit"             element={<ProtectedRoute element={<AuditLogPage />}       adminOnly />} />
@@ -172,7 +171,6 @@ function AppInner() {
                 {/* 404 */}
                 <Route path="*" element={<NotFoundPage />} />
             </Routes>
-            <ChatBot position="fixed" />
         </div>
     );
 }
