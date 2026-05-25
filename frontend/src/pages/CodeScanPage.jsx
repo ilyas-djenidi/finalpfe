@@ -89,7 +89,7 @@ const CodeScanPage = () => {
                         Code Analyzer (SAST)
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm max-w-2xl">
-                        Upload a .zip of your source code. Bandit + Semgrep + Gitleaks run in parallel to find vulnerabilities, secrets, and misconfigurations.
+                        Upload a .zip of your source code. Multiple analysis engines run in parallel to find vulnerabilities, hardcoded secrets, and misconfigurations.
                     </p>
                 </div>
             </div>
@@ -138,7 +138,7 @@ const CodeScanPage = () => {
                             <p className="font-semibold text-slate-600 dark:text-slate-300 mb-2">Supported languages</p>
                             <p>Python · JavaScript/TypeScript · Go · Ruby · Java · C/C++ · PHP · C#</p>
                             <p className="mt-2 font-semibold text-slate-600 dark:text-slate-300">Engines</p>
-                            <p>Bandit · Semgrep (OWASP Top 10) · Gitleaks (secrets)</p>
+                            <p>Vulnerability patterns · OWASP Top 10 rules · Secret detection</p>
                         </div>
 
                         <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/50">
@@ -255,7 +255,7 @@ const CodeScanPage = () => {
                             <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="h-96 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/50">
                                 <Activity className="w-12 h-12 text-primary-500 animate-pulse mb-6" />
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Analyzing Source Code</h3>
-                                <p className="text-sm text-slate-500 text-center max-w-sm px-4">Running Bandit, Semgrep, and Gitleaks in parallel. This may take 30–60 seconds.</p>
+                                <p className="text-sm text-slate-500 text-center max-w-sm px-4">Running analysis engines in parallel — vulnerability detection, OWASP rules, and secret scanning. This may take 30–60 seconds.</p>
                             </motion.div>
                         ) : (
                             <div className="h-96 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900">

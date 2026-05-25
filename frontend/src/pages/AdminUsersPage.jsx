@@ -20,6 +20,7 @@ const AdminUsersPage = () => {
     const [adding, setAdding]               = useState(false);
     const [createError, setCreateError]     = useState('');
     const [createSuccess, setCreateSuccess] = useState('');
+    const [showModal, setShowModal]         = useState(false);
 
     // Filters & pagination
     const [search, setSearch]   = useState('');
@@ -62,6 +63,7 @@ const AdminUsersPage = () => {
                 setCreateSuccess(`Account "${newUsername}" created.`);
                 setNewUsername(''); setNewPassword(''); setConfirmPw('');
                 fetchUsers(1); setPage(1);
+                setTimeout(() => { setShowModal(false); setCreateSuccess(''); }, 1500);
             } else {
                 setCreateError(data.error || 'Failed to create user.');
             }
@@ -109,90 +111,137 @@ const AdminUsersPage = () => {
         </div>
     );
 
+    const closeModal = () => {
+        setShowModal(false);
+        setCreateError('');
+        setCreateSuccess('');
+        setNewUsername(''); setNewPassword(''); setConfirmPw('');
+    };
+
     return (
         <div className="animate-in fade-in duration-500">
-            <div className="mb-8">
-                <Link to="/admin" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4">
-                    <ArrowLeft className="w-4 h-4" /> Back to Admin Panel
-                </Link>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                    <Users className="w-8 h-8 text-primary-500" /> User Management
-                </h1>
-                <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">Provision, modify, and revoke access for platform operators.</p>
+            {/* ── Header ── */}
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <Link to="/admin" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4">
+                        <ArrowLeft className="w-4 h-4" /> Back to Admin Panel
+                    </Link>
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                        <Users className="w-8 h-8 text-primary-500" /> User Management
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">Provision, modify, and revoke access for platform operators.</p>
+                </div>
+                <button
+                    onClick={() => setShowModal(true)}
+                    className="self-start sm:self-auto flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold rounded-xl shadow-md shadow-primary-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <UserPlus className="w-4 h-4" /> Provision New Account
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Create User Form */}
-                <div className="lg:col-span-4 space-y-6">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
-                            <UserPlus className="w-4 h-4" /> Provision New Account
-                        </h2>
-
-                        {createError && (
-                            <div className="mb-4 flex items-start gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg px-3 py-2.5">
-                                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                                <p className="text-red-700 dark:text-red-400 text-xs font-medium">{createError}</p>
-                            </div>
-                        )}
-                        {createSuccess && (
-                            <div className="mb-4 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-lg px-3 py-2.5">
-                                <p className="text-green-700 dark:text-green-400 text-xs font-medium">{createSuccess}</p>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleCreateUser} className="space-y-4">
-                            {[
-                                { label: 'Username', type: 'text', val: newUsername, set: setNewUsername, ph: 'operator1' },
-                                { label: 'Password', type: 'password', val: newPassword, set: setNewPassword, ph: 'Min 10 chars…' },
-                                { label: 'Confirm Password', type: 'password', val: confirmPw, set: setConfirmPw, ph: 'Repeat password' },
-                            ].map(f => (
-                                <div key={f.label}>
-                                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{f.label}</label>
-                                    <input
-                                        type={f.type}
-                                        value={f.val}
-                                        onChange={e => f.set(e.target.value)}
-                                        placeholder={f.ph}
-                                        required
-                                        className={`w-full bg-slate-50 dark:bg-slate-950 border rounded-lg px-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow ${
-                                            f.label === 'Confirm Password' && confirmPw && confirmPw !== newPassword
-                                                ? 'border-red-400 dark:border-red-500'
-                                                : 'border-slate-300 dark:border-slate-700'
-                                        }`}
-                                    />
-                                    {f.label === 'Confirm Password' && confirmPw && confirmPw !== newPassword && (
-                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">Passwords do not match.</p>
-                                    )}
-                                </div>
-                            ))}
-
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Clearance Level</label>
-                                <select
-                                    value={newRole}
-                                    onChange={e => setNewRole(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                                >
-                                    <option value="operator">Operator (Standard)</option>
-                                    <option value="analyst">Analyst (Read-only)</option>
-                                    <option value="admin">Administrator (Full Access)</option>
-                                </select>
-                            </div>
-                            <p className="text-[10px] text-slate-400">Password must be ≥10 chars with upper, lower, digit, and symbol.</p>
+            {/* ── Modal ── */}
+            {showModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        onClick={closeModal}
+                    />
+                    {/* Dialog */}
+                    <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                        {/* Modal header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                                <UserPlus className="w-4 h-4 text-primary-500" /> Provision New Account
+                            </h2>
                             <button
-                                type="submit"
-                                disabled={adding || !newUsername || !newPassword || newPassword !== confirmPw}
-                                className="w-full mt-2 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white shadow-md shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={closeModal}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
-                                {adding ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Provisioning...</> : 'Create Account'}
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
-                        </form>
+                        </div>
+
+                        {/* Modal body */}
+                        <div className="px-6 py-5">
+                            {createError && (
+                                <div className="mb-4 flex items-start gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg px-3 py-2.5">
+                                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                    <p className="text-red-700 dark:text-red-400 text-xs font-medium">{createError}</p>
+                                </div>
+                            )}
+                            {createSuccess && (
+                                <div className="mb-4 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-lg px-3 py-2.5 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                    <p className="text-green-700 dark:text-green-400 text-xs font-medium">{createSuccess}</p>
+                                </div>
+                            )}
+
+                            <form onSubmit={handleCreateUser} className="space-y-4">
+                                {[
+                                    { label: 'Username', type: 'text', val: newUsername, set: setNewUsername, ph: 'operator1' },
+                                    { label: 'Password', type: 'password', val: newPassword, set: setNewPassword, ph: 'Min 10 chars…' },
+                                    { label: 'Confirm Password', type: 'password', val: confirmPw, set: setConfirmPw, ph: 'Repeat password' },
+                                ].map(f => (
+                                    <div key={f.label}>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{f.label}</label>
+                                        <input
+                                            type={f.type}
+                                            value={f.val}
+                                            onChange={e => f.set(e.target.value)}
+                                            placeholder={f.ph}
+                                            required
+                                            className={`w-full bg-slate-50 dark:bg-slate-950 border rounded-lg px-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow ${
+                                                f.label === 'Confirm Password' && confirmPw && confirmPw !== newPassword
+                                                    ? 'border-red-400 dark:border-red-500'
+                                                    : 'border-slate-300 dark:border-slate-700'
+                                            }`}
+                                        />
+                                        {f.label === 'Confirm Password' && confirmPw && confirmPw !== newPassword && (
+                                            <p className="mt-1 text-xs text-red-600 dark:text-red-400">Passwords do not match.</p>
+                                        )}
+                                    </div>
+                                ))}
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Clearance Level</label>
+                                    <select
+                                        value={newRole}
+                                        onChange={e => setNewRole(e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                    >
+                                        <option value="operator">Operator (Standard)</option>
+                                        <option value="analyst">Analyst (Read-only)</option>
+                                        <option value="admin">Administrator (Full Access)</option>
+                                    </select>
+                                </div>
+
+                                <p className="text-[10px] text-slate-400">Password must be ≥10 chars with upper, lower, digit, and symbol.</p>
+
+                                <div className="flex gap-3 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={closeModal}
+                                        className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={adding || !newUsername || !newPassword || newPassword !== confirmPw}
+                                        className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white shadow-md shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {adding ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Provisioning...</> : 'Create Account'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                {/* Users List */}
-                <div className="lg:col-span-8 space-y-4">
+            {/* ── Users List (full width now) ── */}
+            <div className="space-y-4">
                     {/* Filter bar */}
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="relative flex-1 min-w-[180px]">
@@ -361,7 +410,6 @@ const AdminUsersPage = () => {
                             </div>
                         )}
                     </div>
-                </div>
             </div>
         </div>
     );

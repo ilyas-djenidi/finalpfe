@@ -21,6 +21,7 @@ def _get_db() -> sqlite3.Connection:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA busy_timeout=5000")
         _local.conn = conn
     return _local.conn
 
@@ -31,7 +32,8 @@ def _exec(sql: str, params: tuple = ()) -> sqlite3.Cursor:
         cur = db.execute(sql, params)
         db.commit()
         return cur
-    except sqlite3.OperationalError as exc:
+    except Exception as exc:
+        db.rollback()
         logger.error("DB error | sql=%s | params=%s | err=%s", sql[:80], params, exc)
         raise
 
@@ -73,7 +75,25 @@ def init_db():
             low_count        INTEGER NOT NULL DEFAULT 0,
             result_json      TEXT    NOT NULL,
             original_content TEXT,
-            stored_at        TEXT    NOT NULL
+            stored_at        TEXT    NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
+        );
+
+        CREATE TABLE IF NOT EXISTS scan_vulnerabilities (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            report_id   INTEGER NOT NULL,
+            check_name  TEXT    NOT NULL,
+            severity    TEXT    NOT NULL CHECK (severity IN ('critical','high','medium','low','info')),
+            title       TEXT    NOT NULL,
+            description TEXT,
+            evidence    TEXT,
+            remediation TEXT,
+            line_number INTEGER NOT NULL DEFAULT 0,
+            cve_ids     TEXT    NOT NULL DEFAULT '[]',
+            is_fixed    INTEGER NOT NULL DEFAULT 0,
+            fixed_at    TEXT,
+            found_at    TEXT    NOT NULL,
+            FOREIGN KEY (report_id) REFERENCES scan_reports(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS audit_logs (
@@ -90,13 +110,36 @@ def init_db():
             created_at   TEXT    NOT NULL
         );
 
-        CREATE INDEX IF NOT EXISTS idx_scan_reports_user   ON scan_reports (user_id);
-        CREATE INDEX IF NOT EXISTS idx_scan_reports_stored ON scan_reports (stored_at);
-        CREATE INDEX IF NOT EXISTS idx_audit_logs_user     ON audit_logs (user_id);
-        CREATE INDEX IF NOT EXISTS idx_audit_logs_action   ON audit_logs (action);
-        CREATE INDEX IF NOT EXISTS idx_audit_logs_category ON audit_logs (category);
+        CREATE INDEX IF NOT EXISTS idx_users_username        ON users (username);
+        CREATE INDEX IF NOT EXISTS idx_scan_reports_user     ON scan_reports (user_id, stored_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_scan_reports_token    ON scan_reports (token);
+        CREATE INDEX IF NOT EXISTS idx_scan_reports_stored   ON scan_reports (stored_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_scan_reports_type     ON scan_reports (scan_type);
+        CREATE INDEX IF NOT EXISTS idx_vulns_report          ON scan_vulnerabilities (report_id);
+        CREATE INDEX IF NOT EXISTS idx_vulns_severity        ON scan_vulnerabilities (severity, report_id);
+        CREATE INDEX IF NOT EXISTS idx_vulns_check           ON scan_vulnerabilities (check_name);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_user       ON audit_logs (user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_action     ON audit_logs (action);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_category   ON audit_logs (category);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_time       ON audit_logs (created_at DESC);
     """)
     db.commit()
+
+    # Built-in migrations for existing databases
+    for migration in [
+        "ALTER TABLE users ADD COLUMN totp_secret TEXT",
+        "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN last_login TEXT",
+        "ALTER TABLE users ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN locked_until TEXT",
+    ]:
+        try:
+            db.execute(migration)
+            db.commit()
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
     _bootstrap_admin()
     logger.info("database ready | path=%s", DB_PATH)
 
@@ -107,8 +150,10 @@ def _bootstrap_admin():
     count = _get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if count > 0:
         return
-    admin_pw   = os.environ.get("CYBRAIN_ADMIN_PASSWORD",   "ChangeThisAdmin123!")
-    analyst_pw = os.environ.get("CYBRAIN_ANALYST_PASSWORD", "ChangeThisAnalyst123!")
+
+    admin_pw   = os.environ.get("CYBRAIN_ADMIN_PASSWORD",   "").strip() or "Admin@2024!"
+    analyst_pw = os.environ.get("CYBRAIN_ANALYST_PASSWORD", "").strip() or "Analyst@2024!"
+
     now = datetime.now(timezone.utc).isoformat()
     for username, password, role in [
         ("admin",   admin_pw,   "admin"),
@@ -129,7 +174,10 @@ def _bootstrap_admin():
         except sqlite3.IntegrityError:
             pass
     _get_db().commit()
-    logger.info("bootstrapped default admin + analyst accounts")
+    logger.warning(
+        "bootstrapped default accounts — change passwords immediately | admin=%s | analyst=%s",
+        admin_pw, analyst_pw,
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -245,6 +293,12 @@ def update_user_totp(user_id: int, secret: str, enabled: bool) -> tuple[bool, st
     return True, ""
 
 
+def delete_user(uid: int) -> tuple[bool, str]:
+    """Soft delete — deactivates the user without removing the record."""
+    _exec("UPDATE users SET is_active=0 WHERE id=?", (uid,))
+    return True, "User deactivated."
+
+
 def hard_delete_user(uid: int) -> tuple[bool, str]:
     _exec("DELETE FROM users WHERE id=?", (uid,))
     return True, "User deleted."
@@ -329,16 +383,53 @@ def store_report(result: dict, risk_score: float, original_content: str | None,
     vulns = result.get("vulnerabilities", [])
     c, h, m, l = _count_severities(vulns)
     now = datetime.now(timezone.utc).isoformat()
-    _exec(
-        "INSERT INTO scan_reports"
-        " (token,user_id,username,scan_type,target,risk_score,vuln_count,"
-        "  critical_count,high_count,medium_count,low_count,result_json,original_content,stored_at)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (token, user_id, username,
-         result.get("scan_type", ""), result.get("target", ""),
-         risk_score, len(vulns), c, h, m, l,
-         json.dumps(result), original_content, now),
-    )
+    db = _get_db()
+    try:
+        cursor = db.execute(
+            "INSERT INTO scan_reports"
+            " (token,user_id,username,scan_type,target,risk_score,vuln_count,"
+            "  critical_count,high_count,medium_count,low_count,result_json,original_content,stored_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (token, user_id, username,
+             result.get("scan_type", ""), result.get("target", ""),
+             risk_score, len(vulns), c, h, m, l,
+             json.dumps(result), original_content, now),
+        )
+        report_id = cursor.lastrowid
+
+        for vuln in vulns:
+            sev = (str(vuln.get("severity", "low")).strip().lower() or "low")
+            if sev not in {"critical", "high", "medium", "low", "info"}:
+                sev = "low"
+            raw_cves = vuln.get("cve_ids", [])
+            if isinstance(raw_cves, str):
+                cve_list = [c.strip() for c in raw_cves.split(",") if c.strip()]
+            elif isinstance(raw_cves, list):
+                cve_list = [str(c).strip() for c in raw_cves if str(c).strip()]
+            else:
+                cve_list = []
+            db.execute(
+                "INSERT INTO scan_vulnerabilities"
+                " (report_id,check_name,severity,title,description,evidence,"
+                "  remediation,line_number,cve_ids,is_fixed,fixed_at,found_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,0,NULL,?)",
+                (
+                    report_id,
+                    str(vuln.get("check", "unknown_check")),
+                    sev,
+                    str(vuln.get("title", "Untitled finding")),
+                    str(vuln.get("description", "")),
+                    str(vuln.get("evidence", "")),
+                    str(vuln.get("remediation", "")),
+                    int(vuln.get("line_number", 0) or 0),
+                    json.dumps(cve_list),
+                    now,
+                ),
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return token
 
 
@@ -527,12 +618,24 @@ def get_system_stats() -> dict:
 
 
 def get_top_vulnerabilities(limit: int = 10) -> list[dict]:
-    """Return the most frequent vulnerability titles across all scans."""
+    """Return the most frequent vulnerability check_names from the dedicated table."""
     rows = _get_db().execute(
+        "SELECT check_name, severity, COUNT(*) AS count"
+        " FROM scan_vulnerabilities"
+        " GROUP BY check_name, severity"
+        " ORDER BY count DESC"
+        " LIMIT ?",
+        (limit,),
+    ).fetchall()
+    if rows:
+        return [{"check_name": r["check_name"], "severity": r["severity"], "count": r["count"]}
+                for r in rows]
+    # Fallback: parse result_json for databases that predate the scan_vulnerabilities table
+    result_rows = _get_db().execute(
         "SELECT result_json FROM scan_reports ORDER BY stored_at DESC LIMIT 100"
     ).fetchall()
     counts: dict[str, dict] = {}
-    for row in rows:
+    for row in result_rows:
         try:
             vulns = json.loads(row["result_json"]).get("vulnerabilities", [])
         except (ValueError, TypeError):

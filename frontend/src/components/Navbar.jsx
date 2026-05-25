@@ -1,29 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-    ShieldAlert, 
-    Moon, 
-    Sun, 
-    User,
-    LogOut,
-    Menu,
-    X,
-    ChevronDown
+import {
+    ShieldAlert, Moon, Sun, User, LogOut, Menu, X,
+    ChevronDown, Network, Globe, Code, Server, Package,
+    Shield, Wifi, FileSearch, Layers, Zap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const NavLink = ({ to, label, active }) => (
-    <Link
-        to={to}
-        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            active 
-                ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white' 
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50'
-        }`}
-    >
-        {label}
-    </Link>
-);
+const NAV_GROUPS = [
+    {
+        label: 'Scan Network',
+        icon: Network,
+        items: [
+            { label: 'Internal Network Scan', desc: 'Discover internal hosts and services', to: '/scan/network', icon: Wifi },
+            { label: 'External Network Scan', desc: 'Map external attack surface', to: '/scan/network-ext', icon: Network },
+        ],
+    },
+    {
+        label: 'Scan Web',
+        icon: Globe,
+        items: [
+            { label: 'Web Application Scan', desc: 'Automated vulnerability assessment', to: '/scan/web', icon: Globe },
+            { label: 'Dynamic Analysis', desc: 'Runtime behavior and injection testing', to: '/scan/dast', icon: Zap },
+            { label: 'Code Analysis', desc: 'Static source code security review', to: '/scan/code', icon: Layers },
+        ],
+    },
+    {
+        label: 'Scan Server',
+        icon: Server,
+        items: [
+            { label: 'Internal Config Audit', desc: 'Analyse uploaded config file for issues', to: '/scan/apache', icon: FileSearch },
+            { label: 'External Server Audit', desc: 'Probe server externally for misconfigs', to: '/scan/server-ext', icon: Shield },
+        ],
+    },
+];
+
+function DropdownMenu({ group, pathname, onClose }) {
+    const Icon = group.icon;
+    const isActive = group.items.some(i => pathname.startsWith(i.to));
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                onClick={() => setOpen(o => !o)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isActive
+                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50'
+                }`}
+            >
+                <Icon className="w-3.5 h-3.5" />
+                {group.label}
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+            </button>
+
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+                    <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                        {group.items.map(item => {
+                            const ItemIcon = item.icon;
+                            const active = pathname === item.to;
+                            return (
+                                <Link
+                                    key={item.to}
+                                    to={item.to}
+                                    onClick={() => { setOpen(false); onClose?.(); }}
+                                    className={`flex items-start gap-3 px-4 py-3 mx-1.5 rounded-lg transition-colors ${
+                                        active
+                                            ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300'
+                                            : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                    }`}
+                                >
+                                    <div className={`mt-0.5 p-1.5 rounded-md flex-shrink-0 ${active ? 'bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                                        <ItemIcon className="w-3.5 h-3.5" />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-semibold leading-tight">{item.label}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -74,41 +146,75 @@ const Navbar = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
                     {/* Left: Brand & Desktop Nav */}
-                    <div className="flex items-center gap-8">
-                        <Link to="/dashboard" className="flex items-center gap-2">
+                    <div className="flex items-center gap-6">
+                        <Link to="/dashboard" className="flex items-center gap-2 flex-shrink-0">
                             <div className="w-8 h-8 rounded bg-primary-600 flex items-center justify-center shadow-sm">
                                 <ShieldAlert className="w-4 h-4 text-white" />
                             </div>
-                            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">CyBrain</span>
+                            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">securAX</span>
                         </Link>
 
-                        <div className="hidden md:flex items-center gap-1">
-                            <NavLink to="/dashboard" label="Overview" active={pathname === '/dashboard'} />
-                            <NavLink to="/web-scan" label="Web Scan" active={pathname === '/web-scan'} />
-                            <NavLink to="/network-scan" label="Network" active={pathname === '/network-scan'} />
-                            <NavLink to="/code-scan" label="Code" active={pathname === '/code-scan'} />
-                            <NavLink to="/dependency-scan" label="Dependencies" active={pathname === '/dependency-scan'} />
-                            <NavLink to="/dast-scan" label="DAST" active={pathname === '/dast-scan'} />
-                            <NavLink to="/apache-scan" label="Config" active={pathname === '/apache-scan'} />
-                            {/* AI Chat — highlighted link */}
+                        <div className="hidden lg:flex items-center gap-0.5">
+                            {/* Overview */}
+                            <Link
+                                to="/dashboard"
+                                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                    pathname === '/dashboard'
+                                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50'
+                                }`}
+                            >
+                                Overview
+                            </Link>
+
+                            {/* Grouped dropdowns */}
+                            {NAV_GROUPS.map(group => (
+                                <DropdownMenu key={group.label} group={group} pathname={pathname} />
+                            ))}
+
+                            {/* Dependencies */}
+                            <Link
+                                to="/scan/dependencies"
+                                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                    pathname === '/scan/dependencies'
+                                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50'
+                                }`}
+                            >
+                                <Package className="w-3.5 h-3.5" />
+                                Dependencies
+                            </Link>
+
+                            {/* ARIA AI */}
                             <Link
                                 to="/chat"
                                 className={`px-3 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
                                     pathname === '/chat'
-                                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                                        ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30'
                                         : 'text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/20'
                                 }`}
                             >
                                 <span className="text-[11px]">✦</span> ARIA AI
                             </Link>
+
+                            {/* Admin */}
                             {user.role === 'admin' && (
-                                <NavLink to="/admin" label="Admin" active={pathname.startsWith('/admin')} />
+                                <Link
+                                    to="/admin"
+                                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        pathname.startsWith('/admin')
+                                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50'
+                                    }`}
+                                >
+                                    Admin
+                                </Link>
                             )}
                         </div>
                     </div>
 
                     {/* Right: Actions */}
-                    <div className="hidden md:flex items-center gap-4">
+                    <div className="hidden md:flex items-center gap-3">
                         <button
                             onClick={toggleLang}
                             title={lang === 'en' ? 'Switch to Arabic' : 'Switch to English'}
@@ -124,7 +230,7 @@ const Navbar = () => {
                         </button>
 
                         <div className="relative">
-                            <button 
+                            <button
                                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                                 className="flex items-center gap-2 p-1 pl-3 pr-2 rounded-full border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900 transition-colors"
                             >
@@ -135,14 +241,10 @@ const Navbar = () => {
                                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                             </button>
 
-                            {/* Dropdown Menu */}
                             {userMenuOpen && (
                                 <>
-                                    <div 
-                                        className="fixed inset-0 z-40" 
-                                        onClick={() => setUserMenuOpen(false)}
-                                    />
-                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-lg border border-slate-200 dark:border-slate-800 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                                         <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
                                             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Signed in as</p>
                                             <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{user.username}</p>
@@ -154,7 +256,7 @@ const Navbar = () => {
                                                 <Link onClick={() => setUserMenuOpen(false)} to="/audit" className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">Audit Logs</Link>
                                             </>
                                         )}
-                                        <button 
+                                        <button
                                             onClick={() => { setUserMenuOpen(false); logout(); }}
                                             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 mt-1 border-t border-slate-100 dark:border-slate-800"
                                         >
@@ -168,7 +270,7 @@ const Navbar = () => {
 
                     {/* Mobile Menu Button */}
                     <div className="flex items-center md:hidden">
-                        <button 
+                        <button
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                             className="p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-md"
                         >
@@ -181,17 +283,27 @@ const Navbar = () => {
             {/* Mobile Menu */}
             {mobileMenuOpen && (
                 <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 pt-2 pb-4 space-y-1">
-                    <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Overview</Link>
-                    <Link to="/web-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Web Scan</Link>
-                    <Link to="/network-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Network</Link>
-                    <Link to="/code-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Code</Link>
-                    <Link to="/dependency-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Dependencies</Link>
-                    <Link to="/dast-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">DAST</Link>
-                    <Link to="/apache-scan" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Config</Link>
-                    <Link to="/chat" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10">✦ ARIA AI Chat</Link>
+                    <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Overview</Link>
+
+                    <p className="px-3 pt-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scan Network</p>
+                    <Link to="/scan/network" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">Internal Network Scan</Link>
+                    <Link to="/scan/network-ext" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">External Network Scan</Link>
+
+                    <p className="px-3 pt-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scan Web</p>
+                    <Link to="/scan/web" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">Web Application Scan</Link>
+                    <Link to="/scan/dast" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">Dynamic Analysis</Link>
+                    <Link to="/scan/code" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">Code Analysis</Link>
+
+                    <p className="px-3 pt-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scan Server</p>
+                    <Link to="/scan/apache" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">Internal Config Audit</Link>
+                    <Link to="/scan/server-ext" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">External Server Audit</Link>
+
+                    <Link to="/scan/dependencies" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800">Dependencies</Link>
+                    <Link to="/chat" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10">✦ ARIA AI</Link>
                     {user.role === 'admin' && (
-                        <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-primary-600 dark:text-primary-400 hover:bg-slate-50 dark:hover:bg-slate-800">Admin Panel</Link>
+                        <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-slate-50 dark:hover:bg-slate-800">Admin Panel</Link>
                     )}
+
                     <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
                         <div className="flex items-center gap-3 px-3">
                             <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">

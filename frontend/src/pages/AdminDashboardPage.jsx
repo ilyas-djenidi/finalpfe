@@ -5,7 +5,8 @@ import {
     Users, Shield, Activity, BarChart2, AlertOctagon,
     ShieldAlert, RefreshCw, Calendar, Database, FileText,
     TrendingUp, Bug, Clock, UserCheck, Lock, ChevronRight,
-    Radar,
+    Radar, Globe, Network, Code, Package, Zap, Server,
+    FileSearch, Layers,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -478,61 +479,8 @@ const AdminDashboardPage = () => {
                     </button>
                 </div>
             </div>
-
-            {/* ── Quick navigation ────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                    {
-                        to: '/admin/users',
-                        icon: Users,
-                        label: 'User Management',
-                        desc: 'Create & revoke accounts',
-                        color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10',
-                    },
-                    {
-                        to: '/admin/scans',
-                        icon: Database,
-                        label: 'Scan Records',
-                        desc: 'All platform scan history',
-                        color: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10',
-                    },
-                    {
-                        to: '/audit',
-                        icon: FileText,
-                        label: 'Audit Log',
-                        desc: 'Immutable event trail',
-                        color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10',
-                    },
-                    {
-                        to: '/dashboard',
-                        icon: Activity,
-                        label: 'My Dashboard',
-                        desc: 'Personal scan workspace',
-                        color: 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10',
-                    },
-                ].map(item => {
-                    const Icon = item.icon;
-                    return (
-                        <Link
-                            key={item.to}
-                            to={item.to}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4 group"
-                        >
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${item.color}`}>
-                                <Icon className="w-5 h-5" />
-                            </div>
-                            <div className="min-w-0">
-                                <div className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                                    {item.label}
-                                </div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">{item.desc}</div>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-primary-500 transition-colors flex-shrink-0" />
-                        </Link>
-                    );
-                })}
-            </div>
         </div>
+
     );
 };
 

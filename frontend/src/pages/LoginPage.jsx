@@ -159,7 +159,7 @@ const LoginPage = () => {
                     <ShieldAlert className="w-7 h-7 text-white" />
                 </div>
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    CyBrain Security
+                    securAX Security
                 </h2>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                     Sign in to your enterprise account
@@ -290,7 +290,8 @@ const LoginPage = () => {
                     </form>
 
                     <div className="mt-6 text-center">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-gray-500 font-inter">securAX Security Intelligence</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
                             Don't have an account?{' '}
                             <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400">
                                 Register here

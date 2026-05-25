@@ -48,7 +48,7 @@ const NetworkTab = ({ onScan, loading }) => {
                     network-level vulnerabilities.
                     <span className="text-cyan-500/60
                                      ml-2 text-xs">
-                        Test on: scanme.nmap.org
+                        Example: 192.168.1.1 or target.example.com
                     </span>
                 </p>
             </div>
@@ -70,7 +70,7 @@ const NetworkTab = ({ onScan, loading }) => {
                         onKeyDown={e =>
                             e.key === 'Enter' && handleScan()
                         }
-                        placeholder="scanme.nmap.org or 192.168.1.1"
+                        placeholder="192.168.1.1 or target.example.com"
                         className="flex-1 bg-black/40
                                    border border-gray-700/50
                                    rounded-xl px-4 py-3
@@ -176,7 +176,7 @@ const NetworkTab = ({ onScan, loading }) => {
                               font-inter leading-relaxed">
                     Only scan systems you own or have
                     explicit written permission to test.
-                    Authorized targets: scanme.nmap.org,
+                    Authorized targets: your lab VMs,
                     testphp.vulnweb.com, localhost.
                 </p>
             </div>

@@ -26,6 +26,7 @@ import AdminUsersPage     from './pages/AdminUsersPage';
 import AdminScansPage     from './pages/AdminScansPage';
 import AuditLogPage       from './pages/AuditLogPage';
 import ChatPage           from './pages/ChatPage';
+import LandingPage        from './pages/LandingPage';
 
 
 // ── Error Boundary ─────────────────────────────────────────────────────────
@@ -105,6 +106,13 @@ const ProtectedRoute = ({ element, adminOnly = false }) => {
 };
 
 
+// ── Smart Root Redirect ────────────────────────────────────────────────────
+const RootRedirect = () => {
+    const { user, loading } = useAuth();
+    if (loading) return null;
+    return <Navigate to={user ? '/dashboard' : '/landing'} replace />;
+};
+
 // ── App Root ───────────────────────────────────────────────────────────────
 function AppInner() {
     React.useEffect(() => {
@@ -119,7 +127,8 @@ function AppInner() {
             <ToastContainer />
             <Routes>
                 {/* Public */}
-                <Route path="/"         element={<Navigate to="/dashboard" replace />} />
+                <Route path="/"         element={<RootRedirect />} />
+                <Route path="/landing"  element={<LandingPage />} />
                 <Route path="/login"    element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
 
@@ -141,6 +150,10 @@ function AppInner() {
 
                 <Route path="/scan/dependencies" element={<ProtectedRoute element={<DependencyScanPage />} />} />
                 <Route path="/dependency-scan"   element={<Navigate to="/scan/dependencies" replace />} />
+
+                {/* New route aliases for reorganized nav */}
+                <Route path="/scan/network-ext"  element={<ProtectedRoute element={<NetworkScanPage />} />} />
+                <Route path="/scan/server-ext"   element={<ProtectedRoute element={<ApacheScanPage />} />} />
 
                 {/* Reports & Dashboard */}
                 <Route path="/reports"           element={<ProtectedRoute element={<ReportPage />} />} />

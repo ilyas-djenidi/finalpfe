@@ -225,10 +225,12 @@ const DashboardPage = () => {
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Quick Launch</h2>
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm flex flex-col gap-3">
                         {[
-                            { label: 'Web Scanner', desc: 'Scan URLs for vulnerabilities', href: '/scan/web', icon: Globe, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10' },
-                            { label: 'Network Recon', desc: 'Discover open ports and services', href: '/scan/network', icon: Server, color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' },
-                            { label: 'Code Analyzer', desc: 'SAST scanning for source code', href: '/scan/code', icon: Code, color: 'text-purple-500 bg-purple-50 dark:bg-purple-500/10' },
-                            { label: 'Config Scanner', desc: 'Audit server configurations', href: '/scan/apache', icon: Settings, color: 'text-slate-500 bg-slate-50 dark:bg-slate-500/10' },
+                            { label: 'Web Application Scan', desc: 'Automated vulnerability assessment', href: '/scan/web', icon: Globe, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10' },
+                            { label: 'Network Scan', desc: 'Discover open ports and services', href: '/scan/network', icon: Network, color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' },
+                            { label: 'Dynamic Analysis', desc: 'Runtime behaviour and injection testing', href: '/scan/dast', icon: Zap, color: 'text-orange-500 bg-orange-50 dark:bg-orange-500/10' },
+                            { label: 'Code Analysis', desc: 'Static source code security review', href: '/scan/code', icon: Code, color: 'text-purple-500 bg-purple-50 dark:bg-purple-500/10' },
+                            { label: 'Server Config Audit', desc: 'Upload config for internal analysis', href: '/scan/apache', icon: Settings, color: 'text-teal-500 bg-teal-50 dark:bg-teal-500/10' },
+                            { label: 'Dependencies', desc: 'Detect vulnerable packages', href: '/scan/dependencies', icon: Package, color: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10' },
                         ].map((item) => (
                             <Link 
                                 key={item.href} 

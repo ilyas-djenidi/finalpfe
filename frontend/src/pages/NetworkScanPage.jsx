@@ -88,7 +88,7 @@ const NetworkScanPage = () => {
                         Network Recon
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm max-w-2xl">
-                        Powered by Cybrain high-speed analysis & Nmap intelligence.
+                        CyBrain high-speed active reconnaissance — discover open ports, services, and OS signatures.
                     </p>
                 </div>
             </div>
@@ -103,7 +103,7 @@ const NetworkScanPage = () => {
                                 value={target}
                                 onChange={e => setTarget(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleExecuteScan()}
-                                placeholder="e.g. scanme.nmap.org or 192.168.1.1"
+                                placeholder="e.g. 192.168.1.1 or target.example.com"
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-3 text-slate-900 dark:text-white placeholder-slate-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow"
                             />
                         </div>
