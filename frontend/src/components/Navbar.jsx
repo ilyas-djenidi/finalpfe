@@ -6,6 +6,7 @@ import {
     Shield, Wifi, FileSearch, Layers, Zap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import securaxLogo from '../assets/securax_logo.png';
 
 const NAV_GROUPS = [
     {
@@ -146,9 +147,16 @@ const Navbar = () => {
             <div className="px-4 sm:px-6">
                 <div className="flex items-center h-16">
 
-                    {/* Left spacer — balances the right actions so center is truly centered */}
-                    <div className="flex-1 flex items-center">
-                        {/* intentionally empty on desktop */}
+                    {/* Left Brand Area */}
+                    <div className="flex-1 flex items-center gap-2">
+                        <Link to="/dashboard" className="flex items-center gap-2">
+                            <img 
+                                src={securaxLogo} 
+                                alt="securAX Logo" 
+                                className="w-8 h-8 object-contain rounded-md" 
+                            />
+                            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">securAX</span>
+                        </Link>
                     </div>
 
                     {/* Center: nav items */}
