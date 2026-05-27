@@ -229,25 +229,7 @@ const NetworkScanPage = () => {
                                     )}
                                 </div>
 
-                                {results.recon && (
-                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
-                                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Reconnaissance Summary</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
-                                                <div className="text-xs text-slate-500 mb-1">Resolved IP</div>
-                                                <div className="text-sm font-mono font-medium text-slate-900 dark:text-white">{results.recon.ip || 'Unknown'}</div>
-                                            </div>
-                                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
-                                                <div className="text-xs text-slate-500 mb-1">OS Detection</div>
-                                                <div className="text-sm font-medium text-slate-900 dark:text-white">{results.recon.os || 'Unknown Signature'}</div>
-                                            </div>
-                                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
-                                                <div className="text-xs text-slate-500 mb-1">Open Ports</div>
-                                                <div className="text-sm font-medium text-slate-900 dark:text-white">{results.recon.open_ports} detected</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+
 
                                 <div className="space-y-3">
                                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Findings Log</h3>

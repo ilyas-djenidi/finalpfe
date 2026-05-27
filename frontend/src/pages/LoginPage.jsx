@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Lock, User, ArrowRight, AlertCircle, ShieldAlert, Moon, Sun, KeyRound, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import securaxLogo from '../assets/securax_logo.png';
 
 // ── Silent backend health probe ────────────────────────────────────────────────
 // Uses native fetch (not axios) so no toasts fire during wake-up retries.
@@ -196,9 +197,7 @@ const LoginPage = () => {
 
             {/* Logo + title */}
             <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-                <div className="mx-auto w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30 mb-4">
-                    <ShieldAlert className="w-7 h-7 text-white" />
-                </div>
+                <img src={securaxLogo} alt="securAX Logo" className="mx-auto h-16 w-auto mb-4" />
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                     securAX Security
                 </h2>

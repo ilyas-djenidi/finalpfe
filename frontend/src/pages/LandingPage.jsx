@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import securaxLogo from '../assets/securax_logo.png';
 import {
     ShieldAlert, Shield, Globe, Server, Code, Network,
     Package, Zap, ChevronRight, CheckCircle, Lock, Eye,
@@ -101,9 +102,7 @@ const LandingPage = () => {
             }`}>
                 <div className="max-w-7xl mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/30">
-                            <ShieldAlert className="w-4 h-4 text-white" />
-                        </div>
+                        <img src={securaxLogo} alt="securAX Logo" className="w-8 h-8 object-contain" />
                         <span className="font-bold text-lg tracking-tight text-white">securAX</span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -317,9 +316,7 @@ const LandingPage = () => {
                     <div className="relative bg-gradient-to-br from-primary-600/10 to-primary-700/5 border border-primary-500/20 rounded-3xl p-12 overflow-hidden">
                         <FloatingOrb className="w-64 h-64 bg-primary-500/10" style={{ top: '-30%', left: '-15%' }} />
                         <div className="relative z-10">
-                            <div className="w-16 h-16 rounded-2xl bg-primary-600/20 border border-primary-500/30 flex items-center justify-center mx-auto mb-6">
-                                <ShieldAlert className="w-8 h-8 text-primary-400" />
-                            </div>
+                            <img src={securaxLogo} alt="securAX Logo" className="w-16 h-16 mx-auto mb-6 object-contain" />
                             <h2 className="text-3xl font-bold text-white mb-4">Ready to find your risks?</h2>
                             <p className="text-slate-400 mb-8 text-sm leading-relaxed max-w-lg mx-auto">
                                 Create your free account and run your first security scan in minutes.
@@ -348,9 +345,7 @@ const LandingPage = () => {
             <footer className="border-t border-white/5 py-8 px-6">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded bg-primary-600 flex items-center justify-center">
-                            <ShieldAlert className="w-3.5 h-3.5 text-white" />
-                        </div>
+                        <img src={securaxLogo} alt="securAX Logo" className="w-6 h-6 object-contain" />
                         <span className="text-sm font-bold text-slate-400">securAX</span>
                     </div>
                     <p className="text-xs text-slate-600 text-center">

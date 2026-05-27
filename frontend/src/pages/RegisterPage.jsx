@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Lock, User, ArrowRight, ShieldCheck, AlertCircle, Moon, Sun, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import securaxLogo from '../assets/securax_logo.png';
 
 // ── Password strength ─────────────────────────────────────────────────────────
 // Password must match backend check_password_complexity():
@@ -98,9 +99,7 @@ const RegisterPage = () => {
 
             {/* Logo + title */}
             <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-                <div className="mx-auto w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30 mb-4">
-                    <ShieldCheck className="w-7 h-7 text-white" />
-                </div>
+                <img src={securaxLogo} alt="securAX Logo" className="mx-auto h-16 w-auto mb-4" />
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                     Create Account
                 </h2>
