@@ -4,8 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     Users, AlertTriangle, ShieldCheck, UserPlus, Trash2,
     ArrowLeft, Activity, FileText,
-    Search, ChevronLeft, ChevronRight, RefreshCw, KeyRound, Lock, Unlock,
-    Ban, ShieldOff
+    Search, ChevronLeft, ChevronRight, RefreshCw, KeyRound, Globe, Unlock,
+    Ban, ShieldOff, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,11 +15,12 @@ const AdminUsersPage = () => {
     const [usersList, setUsersList]         = useState([]);
     const [loading, setLoading]             = useState(true);
     const [fetchError, setFetchError]       = useState('');
-    const [newUsername, setNewUsername]     = useState('');
-    const [newPassword, setNewPassword]     = useState('');
-    const [confirmPw, setConfirmPw]         = useState('');
-    const [newRole, setNewRole]             = useState('operator');
-    const [adding, setAdding]               = useState(false);
+    const [newUsername, setNewUsername]         = useState('');
+    const [newPassword, setNewPassword]         = useState('');
+    const [confirmPw, setConfirmPw]             = useState('');
+    const [newRole, setNewRole]                 = useState('analyst');
+    const [newAllowedTarget, setNewAllowedTarget] = useState('');
+    const [adding, setAdding]                   = useState(false);
     const [createError, setCreateError]     = useState('');
     const [createSuccess, setCreateSuccess] = useState('');
     const [showModal, setShowModal]         = useState(false);
@@ -60,10 +61,11 @@ const AdminUsersPage = () => {
             const { data } = await axios.post('/api/admin/users', {
                 username: newUsername, password: newPassword,
                 confirm_password: confirmPw, role: newRole,
+                allowed_target: newRole === 'analyst' ? newAllowedTarget.trim() : '',
             }, { withCredentials: true });
             if (data.ok) {
                 setCreateSuccess(`Account "${newUsername}" created.`);
-                setNewUsername(''); setNewPassword(''); setConfirmPw('');
+                setNewUsername(''); setNewPassword(''); setConfirmPw(''); setNewAllowedTarget('');
                 fetchUsers(1); setPage(1);
                 setTimeout(() => { setShowModal(false); setCreateSuccess(''); }, 1500);
             } else {
@@ -117,7 +119,7 @@ const AdminUsersPage = () => {
         setShowModal(false);
         setCreateError('');
         setCreateSuccess('');
-        setNewUsername(''); setNewPassword(''); setConfirmPw('');
+        setNewUsername(''); setNewPassword(''); setConfirmPw(''); setNewAllowedTarget('');
     };
 
     return (
@@ -209,17 +211,38 @@ const AdminUsersPage = () => {
                                 ))}
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Clearance Level</label>
+                                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Role</label>
                                     <select
                                         value={newRole}
-                                        onChange={e => setNewRole(e.target.value)}
+                                        onChange={e => { setNewRole(e.target.value); setNewAllowedTarget(''); }}
                                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                                     >
-                                        <option value="operator">Operator (Standard)</option>
-                                        <option value="analyst">Analyst (Read-only)</option>
+                                        <option value="analyst">Analyst</option>
                                         <option value="admin">Administrator (Full Access)</option>
                                     </select>
                                 </div>
+
+                                {/* Allowed Target — only relevant for analysts */}
+                                {newRole === 'analyst' && (
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                                            Allowed Target <span className="normal-case font-normal text-slate-400">(optional — leave blank for unrestricted)</span>
+                                        </label>
+                                        <div className="relative">
+                                            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                value={newAllowedTarget}
+                                                onChange={e => setNewAllowedTarget(e.target.value)}
+                                                placeholder="example.com"
+                                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow"
+                                            />
+                                        </div>
+                                        <p className="mt-1 text-[10px] text-slate-400">
+                                            The analyst will only be able to scan this domain/IP. You can change it later.
+                                        </p>
+                                    </div>
+                                )}
 
                                 <p className="text-[10px] text-slate-400">Password must be ≥10 chars with upper, lower, digit, and symbol.</p>
 
@@ -266,7 +289,6 @@ const AdminUsersPage = () => {
                         >
                             <option value="">All Roles</option>
                             <option value="admin">Admin</option>
-                            <option value="operator">Operator</option>
                             <option value="analyst">Analyst</option>
                         </select>
                         <button
@@ -312,8 +334,8 @@ const AdminUsersPage = () => {
                                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 border border-green-200 dark:border-green-500/20">2FA</span>
                                                         )}
                                                         {u.locked_target && (
-                                                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" title={`Locked to: ${u.locked_target}`}>
-                                                                <Lock className="w-2.5 h-2.5" />
+                                                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20" title={`Authorized target: ${u.locked_target}`}>
+                                                                <MapPin className="w-2.5 h-2.5" />
                                                                 {u.locked_target}
                                                             </span>
                                                         )}
@@ -329,10 +351,8 @@ const AdminUsersPage = () => {
                                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20">
                                                             <ShieldCheck className="w-3 h-3" /> Admin
                                                         </span>
-                                                    ) : u.role === 'analyst' ? (
-                                                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20">Analyst</span>
                                                     ) : (
-                                                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">Operator</span>
+                                                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20">Analyst</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -402,14 +422,33 @@ const AdminUsersPage = () => {
                                                                 <KeyRound className="w-3.5 h-3.5" />
                                                             </button>
                                                         )}
-                                                        {u.locked_target && (
+                                                        {/* Set / Edit allowed target — analysts only */}
+                                                        {u.role === 'analyst' && u.username !== user.username && (
                                                             <button
                                                                 onClick={() => {
-                                                                    if (window.confirm(`Reset target lock for "${u.username}"?\nThey will be able to scan any target on their next scan.`))
+                                                                    const current = u.locked_target || '';
+                                                                    const input = window.prompt(
+                                                                        `Set allowed target for "${u.username}"\n\nEnter a domain or IP (e.g. example.com).\nLeave blank to remove the restriction.`,
+                                                                        current
+                                                                    );
+                                                                    if (input === null) return; // cancelled
+                                                                    handlePatch(u.id, { set_allowed_target: input.trim() });
+                                                                }}
+                                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-lg transition-colors"
+                                                                title={u.locked_target ? `Edit allowed target (current: ${u.locked_target})` : 'Set allowed target'}
+                                                            >
+                                                                <Globe className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {/* Clear allowed target */}
+                                                        {u.locked_target && u.username !== user.username && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (window.confirm(`Remove target restriction for "${u.username}"?\nThey will be able to scan any target.`))
                                                                         handlePatch(u.id, { reset_locked_target: true });
                                                                 }}
                                                                 className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 dark:hover:text-amber-400 rounded-lg transition-colors"
-                                                                title={`Unlock target (currently: ${u.locked_target})`}
+                                                                title={`Remove target restriction (current: ${u.locked_target})`}
                                                             >
                                                                 <Unlock className="w-3.5 h-3.5" />
                                                             </button>

@@ -38,7 +38,7 @@ from database import (
     get_user_by_id, get_all_users, count_users, count_active_admins,
     create_user, update_user, hard_delete_user,
     update_last_login, update_user_totp,
-    get_locked_target, set_locked_target,
+    get_locked_target,
     log_event, get_audit_log, get_audit_stats,
     store_report, get_report, get_user_reports, get_all_reports,
     get_dashboard_stats, get_all_dashboard_stats,
@@ -261,11 +261,11 @@ def _normalize_target(raw: str) -> str:
 
 def _check_target_lock(raw_target: str):
     """
-    Enforce one-target-per-analyst restriction.
-    - Admin: always allowed, no lock applied.
-    - Analyst, first scan: lock account to this target, allow.
-    - Analyst, same target: allow.
-    - Analyst, different target: return (False, 403 response).
+    Enforce admin-assigned target restriction.
+    - Admin: always allowed.
+    - Analyst, no target assigned by admin: allowed (unrestricted).
+    - Analyst, target assigned and matches: allowed.
+    - Analyst, target assigned but doesn't match: 403.
 
     Usage::
         ok, err = _check_target_lock(target)
@@ -275,33 +275,30 @@ def _check_target_lock(raw_target: str):
     if current_user.role == "admin":
         return True, None
 
-    normalized = _normalize_target(raw_target)
     locked = get_locked_target(current_user.id)
 
     if locked is None:
-        # First scan — bind this target to the account
-        set_locked_target(current_user.id, normalized)
-        log_event(
-            "target_locked", current_user.username, current_user.id,
-            category="security", resource=normalized, status="success",
-            details=f"Account bound to target on first scan: {normalized}",
-        )
+        # Admin has not assigned a target restriction — allow all scans
         return True, None
 
+    normalized = _normalize_target(raw_target)
     if locked == normalized:
         return True, None
 
-    # Attempted to scan a different target — reject
+    # Target doesn't match the admin-assigned allowed target — reject
     log_event(
         "target_violation", current_user.username, current_user.id,
         category="security", resource=normalized, status="denied",
-        details=f"Blocked: tried {normalized!r}, locked to {locked!r}",
+        details=f"Blocked: tried {normalized!r}, allowed target is {locked!r}",
         ip_address=request.remote_addr,
     )
     return False, (
         jsonify({
-            "error": f"غير مسموح. حسابك مرتبط بالهدف «{locked}» فقط. لا يمكنك فحص هدف مختلف.",
-            "locked_target": locked,
+            "error": (
+                f"غير مسموح. صلاحيات حسابك مقتصرة على الهدف «{locked}» فقط. "
+                f"تواصل مع المدير لتغيير الهدف المصرّح به."
+            ),
+            "allowed_target": locked,
             "forbidden": True,
         }),
         403,
@@ -1552,11 +1549,12 @@ def api_admin_users():
 @csrf.exempt
 @limiter.limit("20/minute")
 def api_admin_create_user():
-    data     = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
-    password = data.get("password", "")
-    confirm  = data.get("confirm_password", "")
-    role     = data.get("role", "analyst")
+    data           = request.get_json(silent=True) or {}
+    username       = (data.get("username") or "").strip()
+    password       = data.get("password", "")
+    confirm        = data.get("confirm_password", "")
+    role           = data.get("role", "analyst")
+    allowed_target = (data.get("allowed_target") or "").strip()
 
     if not username or not password:
         return jsonify({"ok": False, "error": "Username and password required."}), 400
@@ -1567,10 +1565,18 @@ def api_admin_create_user():
     if not ok:
         return jsonify({"ok": False, "error": msg}), 400
 
-    ok, msg = create_user(username, password, role, created_by=current_user.username)
+    # Normalise the target the same way scan enforcement does
+    normalized_target = _normalize_target(allowed_target) if allowed_target else None
+
+    ok, msg = create_user(
+        username, password, role,
+        created_by=current_user.username,
+        allowed_target=normalized_target,
+    )
     if ok:
         log_event("user_created", current_user.username, current_user.id,
-                  category="admin", resource=username, status="success")
+                  category="admin", resource=username, status="success",
+                  details=f"role={role} allowed_target={normalized_target or 'unrestricted'}")
     return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
 
 
@@ -1585,11 +1591,31 @@ def api_admin_update_user(uid: int):
     new_password         = data.get("new_password")
     reset_locked_target  = bool(data.get("reset_locked_target", False))
     reset_failed         = bool(data.get("reset_failed_attempts", False))
+    # set_allowed_target: empty string = clear, non-empty string = set to that value
+    set_allowed_target   = data.get("set_allowed_target")   # None means "not provided"
 
     if new_password:
         ok, msg = check_password_complexity(new_password)
         if not ok:
             return jsonify({"ok": False, "error": msg}), 400
+
+    # Determine locked_target_value to pass to update_user
+    from database import _UNSET as _DB_UNSET
+    locked_target_value = _DB_UNSET   # sentinel — don't touch locked_target
+    audit_action = "user_updated"
+
+    if reset_locked_target:
+        # Explicit clear — handled by reset_locked_target flag in update_user
+        audit_action = "target_lock_reset"
+    elif set_allowed_target is not None:
+        raw = set_allowed_target.strip()
+        if raw:
+            locked_target_value = _normalize_target(raw)
+            audit_action = "target_assigned"
+        else:
+            # Empty string → clear
+            locked_target_value = None
+            audit_action = "target_lock_reset"
 
     ok, msg = update_user(
         uid,
@@ -1598,11 +1624,11 @@ def api_admin_update_user(uid: int):
         is_active=is_active,
         new_password=new_password,
         reset_locked_target=reset_locked_target,
+        locked_target_value=locked_target_value,
         failed_attempts=0 if reset_failed else None,
     )
     if ok:
-        action = "target_lock_reset" if reset_locked_target else "user_updated"
-        log_event(action, current_user.username, current_user.id,
+        log_event(audit_action, current_user.username, current_user.id,
                   category="admin", resource=str(uid), status="success")
     return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
 

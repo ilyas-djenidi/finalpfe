@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = "cybrain.db"
 
+# Sentinel — distinguishes "caller didn't pass locked_target_value" from passing None (clear it)
+_UNSET = object()
+
 # ── Thread-local connection pool ──────────────────────────────────────────────
 _local = threading.local()
 
@@ -240,7 +243,8 @@ def count_users() -> int:
 
 
 def create_user(username: str, password: str, role: str = "analyst",
-                permissions=None, created_by: str | None = None) -> tuple[bool, str]:
+                permissions=None, created_by: str | None = None,
+                allowed_target: str | None = None) -> tuple[bool, str]:
     if permissions is None:
         permissions = (
             ["run_scan", "view_reports", "delete_reports", "manage_users", "view_audit"]
@@ -249,11 +253,13 @@ def create_user(username: str, password: str, role: str = "analyst",
         )
     pw_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     now = datetime.now(timezone.utc).isoformat()
+    # allowed_target → stored in locked_target column
+    target_val = allowed_target.strip().lower() if allowed_target and allowed_target.strip() else None
     try:
         _exec(
-            "INSERT INTO users (username,password_hash,role,permissions,is_active,created_at,created_by)"
-            " VALUES (?,?,?,?,1,?,?)",
-            (username, pw_hash, role, json.dumps(permissions), now, created_by),
+            "INSERT INTO users (username,password_hash,role,permissions,is_active,created_at,created_by,locked_target)"
+            " VALUES (?,?,?,?,1,?,?,?)",
+            (username, pw_hash, role, json.dumps(permissions), now, created_by, target_val),
         )
         return True, "User created successfully."
     except sqlite3.IntegrityError:
@@ -265,7 +271,7 @@ def create_user(username: str, password: str, role: str = "analyst",
 
 def update_user(uid: int, role=None, permissions=None, is_active=None,
                 new_password=None, failed_attempts=None, locked_until=None,
-                reset_locked_target=False, **_) -> tuple[bool, str]:
+                reset_locked_target=False, locked_target_value=_UNSET, **_) -> tuple[bool, str]:
     fields, values = [], []
     if role            is not None: fields.append("role=?");             values.append(role)
     if permissions     is not None: fields.append("permissions=?");      values.append(json.dumps(permissions))
@@ -275,7 +281,11 @@ def update_user(uid: int, role=None, permissions=None, is_active=None,
         fields.append("password_hash=?"); values.append(ph)
     if failed_attempts is not None: fields.append("failed_attempts=?");  values.append(failed_attempts)
     if locked_until    is not None: fields.append("locked_until=?");     values.append(locked_until)
-    if reset_locked_target:         fields.append("locked_target=?");    values.append(None)
+    if reset_locked_target:
+        fields.append("locked_target=?"); values.append(None)
+    elif locked_target_value is not _UNSET:
+        # Admin explicitly setting a target (None = clear, str = set)
+        fields.append("locked_target=?"); values.append(locked_target_value)
     if not fields:
         return True, ""
     values.append(uid)
