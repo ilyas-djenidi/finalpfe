@@ -398,6 +398,46 @@ def _parse_nse_vulns(script_output: dict) -> list[dict]:
     return findings
 
 
+# ── Graceful unavailable result ───────────────────────────────────────────────
+
+def _nmap_unavailable_result(target: str, internal: bool, reason: str) -> dict:
+    """Return a well-formed scan result when nmap is not available on this host."""
+    return {
+        "scan_type":       "network_int" if internal else "network_ext",
+        "target":          target,
+        "vulnerabilities": [
+            {
+                "check":       "nmap_unavailable",
+                "title":       "Network Scan Unavailable",
+                "severity":    "info",
+                "description": (
+                    f"The nmap network scanner is not installed in this deployment environment. "
+                    f"Network scanning requires nmap to be configured on the server. "
+                    f"Detail: {reason}"
+                ),
+                "remediation": (
+                    "To enable network scanning, install nmap on the server: "
+                    "apt install nmap (Debian/Ubuntu) | brew install nmap (macOS) | "
+                    "choco install nmap (Windows). "
+                    "On Render, add a build command: apt-get install -y nmap"
+                ),
+            }
+        ],
+        "hosts":      [],
+        "subdomains": [],
+        "meta": {
+            "scan_time":   datetime.now(timezone.utc).isoformat(),
+            "nmap_args":   "N/A — nmap not installed",
+            "deep":        False,
+            "internal":    internal,
+            "hosts_up":    "0",
+            "total_hosts": "0",
+            "tools_used":  [],
+            "nmap_unavailable": True,
+        },
+    }
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def run_nmap_scan(target: str, deep: bool = False, internal: bool = False) -> dict:
@@ -420,13 +460,14 @@ def run_nmap_scan(target: str, deep: bool = False, internal: bool = False) -> di
     try:
         import nmap  # type: ignore
     except ImportError:
-        raise RuntimeError("python-nmap not installed. Run: pip install python-nmap")
+        logger.warning("python-nmap not installed — returning graceful result")
+        return _nmap_unavailable_result(target, internal, "python-nmap package not installed.")
 
     if not shutil.which("nmap"):
-        raise RuntimeError(
-            "nmap binary not found in PATH. "
-            "Install: https://nmap.org/download.html  /  "
-            "apt install nmap  /  brew install nmap  /  choco install nmap"
+        logger.warning("nmap binary not in PATH — returning graceful result")
+        return _nmap_unavailable_result(
+            target, internal,
+            "nmap binary not found. Install via: apt install nmap / brew install nmap / choco install nmap"
         )
 
     nm = nmap.PortScanner()

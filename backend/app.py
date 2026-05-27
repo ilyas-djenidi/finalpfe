@@ -177,6 +177,17 @@ def load_user(user_id: str):
     return load_user_from_db(user_id)
 
 
+# ── Custom unauthorized handler — returns JSON for /api/* routes ──────────────
+# Without this, Flask-Login redirects unauthenticated API calls to the HTML
+# login page (302), which causes axios to get an unexpected HTML response
+# and report it as a "Connection error" in the frontend.
+@login_manager.unauthorized_handler
+def handle_unauthorized():
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Authentication required. Please log in."}), 401
+    return redirect(url_for("login"))
+
+
 # ── Permission decorator ──────────────────────────────────────────────────────
 def require_permission(permission: str):
     def decorator(f):
