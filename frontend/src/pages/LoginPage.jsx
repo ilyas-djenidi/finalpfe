@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Lock, User, ArrowRight, AlertCircle, ShieldAlert, Moon, Sun, KeyRound, CheckCircle, Wifi, WifiOff, RefreshCw, Loader } from 'lucide-react';
+import { Lock, User, ArrowRight, AlertCircle, ShieldAlert, Moon, Sun, KeyRound, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 
-// ── Backend health probe ───────────────────────────────────────────────────────
+// ── Silent backend health probe ────────────────────────────────────────────────
+// Uses native fetch (not axios) so no toasts fire during wake-up retries.
+// Runs silently in background — no UI shown to the user.
 const BACKEND = import.meta.env.VITE_API_BASE_URL || '';
-const IS_PRODUCTION = !!BACKEND;
 
 async function pingBackend() {
-    // Use native fetch — NOT axios — so the global axios error interceptor
-    // doesn't fire a "Connection error" toast on every failed wake-up probe.
     try {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -21,22 +19,6 @@ async function pingBackend() {
         return false;
     }
 }
-
-// ── Server Status Badge ────────────────────────────────────────────────────────
-const ServerStatus = ({ status }) => {
-    const map = {
-        checking: { icon: <Loader className="w-3 h-3 animate-spin" />, label: 'Checking server…',  cls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700' },
-        online:   { icon: <Wifi    className="w-3 h-3" />,             label: 'Server online',      cls: 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400 border-green-200 dark:border-green-500/20' },
-        waking:   { icon: <Loader  className="w-3 h-3 animate-spin" />, label: 'Server waking up…', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20' },
-        offline:  { icon: <WifiOff className="w-3 h-3" />,             label: 'Server unreachable', cls: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400 border-red-200 dark:border-red-500/20' },
-    };
-    const s = map[status] || map.checking;
-    return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${s.cls}`}>
-            {s.icon}{s.label}
-        </span>
-    );
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -50,15 +32,16 @@ const LoginPage = () => {
     const [loading,     setLoading]     = useState(false);
     const [lockSecs,    setLockSecs]    = useState(0);
 
-    // Server health state
+    // Server health state (silent — no UI shown)
     const [serverStatus, setServerStatus] = useState('checking');
-    const [retryCount,   setRetryCount]   = useState(0);
     const retryTimerRef  = useRef(null);
     const lockIntervalRef = useRef(null);
 
     const { login, verifyTotp } = useAuth();
     const navigate  = useNavigate();
     const location  = useLocation();
+
+    const IS_PRODUCTION = !!import.meta.env.VITE_API_BASE_URL;
 
     const registeredMsg = location.state?.registered
         ? 'Account created successfully — please log in'
@@ -85,12 +68,10 @@ const LoginPage = () => {
         const alive = await pingBackend();
         if (alive) {
             setServerStatus('online');
-            setRetryCount(0);
             if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         } else if (attempt < 8) {
             // Render free tier can take up to ~50s to wake — retry every 7s
             setServerStatus('waking');
-            setRetryCount(attempt + 1);
             retryTimerRef.current = setTimeout(() => checkHealth(attempt + 1), 7000);
         } else {
             setServerStatus('offline');
@@ -198,8 +179,6 @@ const LoginPage = () => {
     };
 
     const isLocked = lockSecs > 0;
-    const isServerDown = serverStatus === 'offline';
-    const isWaking     = serverStatus === 'waking' || serverStatus === 'checking';
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -226,45 +205,6 @@ const LoginPage = () => {
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                     Sign in to your enterprise account
                 </p>
-
-                {/* Server health badge — only show in production */}
-                {IS_PRODUCTION && (
-                    <div className="mt-3 flex justify-center">
-                        <ServerStatus status={serverStatus} />
-                    </div>
-                )}
-
-                {/* Waking up banner */}
-                {IS_PRODUCTION && isWaking && (
-                    <div className="mt-3 mx-auto max-w-xs bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl px-4 py-3 text-left">
-                        <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
-                            ⏳ Backend is starting up
-                        </p>
-                        <p className="text-xs text-amber-600 dark:text-amber-400/80 leading-relaxed">
-                            The free-tier server spins down when idle. It usually takes <strong>30–50 seconds</strong> to wake. Login will work automatically once it's ready.
-                        </p>
-                        {retryCount > 0 && (
-                            <p className="text-[10px] text-amber-500 mt-1.5 font-mono">
-                                Attempt {retryCount}/8 — retrying every 7s…
-                            </p>
-                        )}
-                    </div>
-                )}
-
-                {/* Offline banner */}
-                {IS_PRODUCTION && isServerDown && (
-                    <div className="mt-3 mx-auto max-w-xs bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl px-4 py-3">
-                        <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2">
-                            Server unreachable after 8 attempts
-                        </p>
-                        <button
-                            onClick={() => checkHealth(0)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-lg text-xs font-semibold hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors"
-                        >
-                            <RefreshCw className="w-3 h-3" /> Retry now
-                        </button>
-                    </div>
-                )}
             </div>
 
             {/* Card */}
@@ -376,17 +316,13 @@ const LoginPage = () => {
 
                         <button
                             type="submit"
-                            disabled={loading || isLocked || isServerDown}
+                            disabled={loading || isLocked}
                             className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
                         >
                             {loading ? (
                                 <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Authenticating…</>
                             ) : isLocked ? (
                                 `Locked — ${fmtLock(lockSecs)}`
-                            ) : isServerDown ? (
-                                <><WifiOff className="w-4 h-4" /> Server Unreachable</>
-                            ) : isWaking && IS_PRODUCTION ? (
-                                <><Loader className="w-4 h-4 animate-spin" /> Waiting for server…</>
                             ) : totpStep ? (
                                 <>Verify Code <ArrowRight className="w-4 h-4" /></>
                             ) : (
