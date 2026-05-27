@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
     Users, AlertTriangle, ShieldCheck, UserPlus, Trash2,
     ArrowLeft, Activity, FileText, ToggleLeft, ToggleRight,
-    Search, ChevronLeft, ChevronRight, RefreshCw, KeyRound
+    Search, ChevronLeft, ChevronRight, RefreshCw, KeyRound, Lock, Unlock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const AdminUsersPage = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [usersList, setUsersList]         = useState([]);
     const [loading, setLoading]             = useState(true);
     const [fetchError, setFetchError]       = useState('');
@@ -123,9 +124,12 @@ const AdminUsersPage = () => {
             {/* ── Header ── */}
             <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <Link to="/admin" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4">
+                    <button
+                        onClick={() => navigate('/admin')}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 mb-4 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
                         <ArrowLeft className="w-4 h-4" /> Back to Admin Panel
-                    </Link>
+                    </button>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                         <Users className="w-8 h-8 text-primary-500" /> User Management
                     </h1>
@@ -298,13 +302,19 @@ const AdminUsersPage = () => {
                                             <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                                 <td className="px-4 py-3 text-xs font-mono text-slate-500">#{u.id}</td>
                                                 <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="text-sm font-medium text-slate-900 dark:text-white">{u.username}</span>
                                                         {u.username === user.username && (
                                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary-100 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400 border border-primary-200 dark:border-primary-500/20">YOU</span>
                                                         )}
                                                         {u.totp_enabled && (
                                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 border border-green-200 dark:border-green-500/20">2FA</span>
+                                                        )}
+                                                        {u.locked_target && (
+                                                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" title={`Locked to: ${u.locked_target}`}>
+                                                                <Lock className="w-2.5 h-2.5" />
+                                                                {u.locked_target}
+                                                            </span>
                                                         )}
                                                     </div>
                                                     {u.last_login && (
@@ -363,6 +373,18 @@ const AdminUsersPage = () => {
                                                                 title="Disable 2FA"
                                                             >
                                                                 <KeyRound className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {u.locked_target && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (window.confirm(`Reset target lock for "${u.username}"?\nThey will be able to scan any target on their next scan.`))
+                                                                        handlePatch(u.id, { reset_locked_target: true });
+                                                                }}
+                                                                className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 dark:hover:text-amber-400 rounded-lg transition-colors"
+                                                                title={`Unlock target (currently: ${u.locked_target})`}
+                                                            >
+                                                                <Unlock className="w-3.5 h-3.5" />
                                                             </button>
                                                         )}
                                                         <button

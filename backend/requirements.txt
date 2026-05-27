@@ -1,6 +1,14 @@
 # ──────────────────────────────────────────────────────
-#  CyBrain Security — Python Dependencies (Pinned)
-#  توليد: pip freeze  |  تاريخ: مارس 2026
+#  CyBrain Security — Python Dependencies (Production)
+#  Last updated: May 2026
+#
+#  REMOVED (safe):
+#    semgrep    → called via subprocess only (shutil.which), never imported.
+#                 SAST scanner gracefully skips it when not present.
+#    supabase   → only in database_supabase.py (unused alternate DB file)
+#    redis      → not imported in main app
+#    alembic    → migration tool, not needed at runtime
+#    pytest     → test framework, not needed in production
 # ──────────────────────────────────────────────────────
 
 # ── Core Framework ─────────────────────────────────────
@@ -21,9 +29,6 @@ Flask-Session==0.8.0
 Flask-Cors>=4.0.0
 limits==5.8.0
 
-# ── Caching / Rate Limit Backend ───────────────────────
-redis==5.0.1
-
 # ── Security ───────────────────────────────────────────
 bcrypt==5.0.0
 pyotp==2.9.0
@@ -39,23 +44,17 @@ idna==3.11
 # ── Scanning Tools ─────────────────────────────────────
 python-nmap==0.7.1
 bandit==1.8.3
-semgrep
+# semgrep: install separately on your local machine if needed.
+# DO NOT add it here — its pip dependencies cause resolution-too-deep on Render.
 
 # ── AI / Gemini ────────────────────────────────────────
-google-genai>=2.5.0
+google-genai>=2.5.0,<4.0.0
 
 # ── Environment & Config ───────────────────────────────
 python-dotenv==1.2.1
 
 # ── Production Server ──────────────────────────────────
 gunicorn==25.1.0
-
-# ── Database (Supabase PostgreSQL) ─────────────────────
-supabase==2.10.0
-
-# ── Database Migration / Testing ───────────────────────
-alembic==1.16.4
-pytest==8.4.1
 
 # ── PDF Report Generation ──────────────────────────────
 reportlab>=4.0.0

@@ -38,6 +38,7 @@ from database import (
     get_user_by_id, get_all_users, count_users, count_active_admins,
     create_user, update_user, hard_delete_user,
     update_last_login, update_user_totp,
+    get_locked_target, set_locked_target,
     log_event, get_audit_log, get_audit_stats,
     store_report, get_report, get_user_reports, get_all_reports,
     get_dashboard_stats, get_all_dashboard_stats,
@@ -224,6 +225,64 @@ def admin_required(f):
             return jsonify({"error": "Admin access required."}), 403
         return f(*args, **kwargs)
     return wrapper
+
+
+# ── Analyst target lock ───────────────────────────────────────────────────────
+
+def _normalize_target(raw: str) -> str:
+    """Strip protocol / path / port → bare lowercase hostname or IP."""
+    t = re.sub(r'^https?://', '', raw.strip())
+    t = t.split('/')[0].split('?')[0].split(':')[0]
+    return t.lower().strip()
+
+
+def _check_target_lock(raw_target: str):
+    """
+    Enforce one-target-per-analyst restriction.
+    - Admin: always allowed, no lock applied.
+    - Analyst, first scan: lock account to this target, allow.
+    - Analyst, same target: allow.
+    - Analyst, different target: return (False, 403 response).
+
+    Usage::
+        ok, err = _check_target_lock(target)
+        if not ok:
+            return err
+    """
+    if current_user.role == "admin":
+        return True, None
+
+    normalized = _normalize_target(raw_target)
+    locked = get_locked_target(current_user.id)
+
+    if locked is None:
+        # First scan — bind this target to the account
+        set_locked_target(current_user.id, normalized)
+        log_event(
+            "target_locked", current_user.username, current_user.id,
+            category="security", resource=normalized, status="success",
+            details=f"Account bound to target on first scan: {normalized}",
+        )
+        return True, None
+
+    if locked == normalized:
+        return True, None
+
+    # Attempted to scan a different target — reject
+    log_event(
+        "target_violation", current_user.username, current_user.id,
+        category="security", resource=normalized, status="denied",
+        details=f"Blocked: tried {normalized!r}, locked to {locked!r}",
+        ip_address=request.remote_addr,
+    )
+    return False, (
+        jsonify({
+            "error": f"غير مسموح. حسابك مرتبط بالهدف «{locked}» فقط. لا يمكنك فحص هدف مختلف.",
+            "locked_target": locked,
+            "forbidden": True,
+        }),
+        403,
+    )
 
 
 # ── Error handlers ────────────────────────────────────────────────────────────
@@ -1492,21 +1551,31 @@ def api_admin_create_user():
 @admin_required
 @csrf.exempt
 def api_admin_update_user(uid: int):
-    data         = request.get_json(silent=True) or {}
-    role         = data.get("role")
-    permissions  = data.get("permissions")
-    is_active    = data.get("is_active")
-    new_password = data.get("new_password")
+    data                 = request.get_json(silent=True) or {}
+    role                 = data.get("role")
+    permissions          = data.get("permissions")
+    is_active            = data.get("is_active")
+    new_password         = data.get("new_password")
+    reset_locked_target  = bool(data.get("reset_locked_target", False))
+    reset_failed         = bool(data.get("reset_failed_attempts", False))
 
     if new_password:
         ok, msg = check_password_complexity(new_password)
         if not ok:
             return jsonify({"ok": False, "error": msg}), 400
 
-    ok, msg = update_user(uid, role=role, permissions=permissions,
-                          is_active=is_active, new_password=new_password)
+    ok, msg = update_user(
+        uid,
+        role=role,
+        permissions=permissions,
+        is_active=is_active,
+        new_password=new_password,
+        reset_locked_target=reset_locked_target,
+        failed_attempts=0 if reset_failed else None,
+    )
     if ok:
-        log_event("user_updated", current_user.username, current_user.id,
+        action = "target_lock_reset" if reset_locked_target else "user_updated"
+        log_event(action, current_user.username, current_user.id,
                   category="admin", resource=str(uid), status="success")
     return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
 
@@ -1606,6 +1675,9 @@ def scan_url_bridge():
     exploit_known = bool(data.get("exploit_known", False))
     if not target:
         return jsonify({"error": "URL/target required."}), 400
+    ok, err = _check_target_lock(target)
+    if not ok:
+        return err
     try:
         result = run_web_scan(target, cve_check=True, ssl_check=True)
         vulns  = result.get("vulnerabilities", [])
@@ -1652,6 +1724,9 @@ def scan_network_bridge():
     exploit_known = bool(data.get("exploit_known", False))
     if not target:
         return jsonify({"error": "Target required."}), 400
+    ok, err = _check_target_lock(target)
+    if not ok:
+        return err
     try:
         result = run_nmap_scan(target, deep=deep)
         vulns  = result.get("vulnerabilities", [])
@@ -1806,6 +1881,9 @@ def scan_server_bridge():
     exploit_known = bool(data.get("exploit_known", False))
     if not target:
         return jsonify({"error": "Target required."}), 400
+    ok, err = _check_target_lock(target)
+    if not ok:
+        return err
     try:
         result = run_server_scan(target, deep=deep)
         vulns  = result.get("vulnerabilities", [])
@@ -1851,6 +1929,9 @@ def scan_dast_bridge():
     target        = (data.get("url") or data.get("target") or "").strip()
     if not target:
         return jsonify({"error": "Target URL required."}), 400
+    ok, err = _check_target_lock(target)
+    if not ok:
+        return err
     try:
         result = run_dast_scan(target)
         vulns  = result.get("vulnerabilities", [])

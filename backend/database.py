@@ -133,6 +133,7 @@ def init_db():
         "ALTER TABLE users ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN locked_until TEXT",
+        "ALTER TABLE users ADD COLUMN locked_target TEXT",
     ]:
         try:
             db.execute(migration)
@@ -263,7 +264,8 @@ def create_user(username: str, password: str, role: str = "analyst",
 
 
 def update_user(uid: int, role=None, permissions=None, is_active=None,
-                new_password=None, failed_attempts=None, locked_until=None, **_) -> tuple[bool, str]:
+                new_password=None, failed_attempts=None, locked_until=None,
+                reset_locked_target=False, **_) -> tuple[bool, str]:
     fields, values = [], []
     if role            is not None: fields.append("role=?");             values.append(role)
     if permissions     is not None: fields.append("permissions=?");      values.append(json.dumps(permissions))
@@ -273,6 +275,7 @@ def update_user(uid: int, role=None, permissions=None, is_active=None,
         fields.append("password_hash=?"); values.append(ph)
     if failed_attempts is not None: fields.append("failed_attempts=?");  values.append(failed_attempts)
     if locked_until    is not None: fields.append("locked_until=?");     values.append(locked_until)
+    if reset_locked_target:         fields.append("locked_target=?");    values.append(None)
     if not fields:
         return True, ""
     values.append(uid)
@@ -285,6 +288,19 @@ def update_last_login(user_id: int):
         "UPDATE users SET last_login=?, login_count=login_count+1 WHERE id=?",
         (datetime.now(timezone.utc).isoformat(), user_id),
     )
+
+
+def get_locked_target(user_id: int) -> str | None:
+    """Return the target (hostname/IP) that this analyst is locked to, or None if unset."""
+    row = _get_db().execute(
+        "SELECT locked_target FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    return row["locked_target"] if row else None
+
+
+def set_locked_target(user_id: int, target: str) -> None:
+    """Lock an analyst account to a specific target on their first scan."""
+    _exec("UPDATE users SET locked_target=? WHERE id=?", (target, user_id))
 
 
 def update_user_totp(user_id: int, secret: str, enabled: bool) -> tuple[bool, str]:
