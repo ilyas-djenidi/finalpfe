@@ -46,7 +46,7 @@ from database import (
 )
 from models import authenticate_user, load_user_from_db
 from forms import LoginForm, ScanForm, TOTPForm, ChangePasswordForm, check_password_complexity
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 
 from risk_engine import calculate_risk_v2
 from ai_agent import get_aria
@@ -974,11 +974,15 @@ def admin_audit():
 #  HEALTH CHECK
 # ════════════════════════════════════════════════════════════════════════════
 
-@app.route("/health")
+@app.route("/health", methods=["GET", "OPTIONS"])
+@csrf.exempt
+@cross_origin(origins="*", supports_credentials=False)   # public ping — no auth needed
 def health():
-    status = "ok"
+    """Lightweight liveness probe — called by the login page to detect server wake-up."""
     try:
-        get_system_stats()
+        from database import _get_db
+        _get_db().execute("SELECT 1").fetchone()
+        status = "ok"
     except Exception:
         status = "degraded"
     return jsonify({"status": status, "service": "cybrain"}), 200
