@@ -101,18 +101,31 @@ const DastScanPage = () => {
                             />
                         </div>
 
-                        <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/50">
-                            <label className="flex items-start gap-3 cursor-pointer select-none">
-                                <input 
-                                    type="checkbox" 
+                        <div className={`mb-6 p-4 rounded-xl border transition-colors ${
+                            permissionGranted
+                                ? 'bg-green-50 dark:bg-green-500/10 border-green-300 dark:border-green-500/30'
+                                : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'
+                        }`}>
+                            <label className="flex items-start gap-3 cursor-pointer select-none" dir="rtl">
+                                <input
+                                    type="checkbox"
                                     checked={permissionGranted}
                                     onChange={e => setPermissionGranted(e.target.checked)}
-                                    className="mt-0.5 w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-900"
+                                    className="mt-1 w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-900 flex-shrink-0"
                                 />
-                                <span className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                                    I authorize Cybrain to perform an intrusive dynamic scan on the specified target.
+                                <span className={`text-sm font-semibold leading-relaxed ${
+                                    permissionGranted
+                                        ? 'text-green-700 dark:text-green-400'
+                                        : 'text-amber-700 dark:text-amber-400'
+                                }`}>
+                                    أتعهد بشرفي أنني مُخوَّل بإجراء هذا الفحص الأمني على الهدف المحدد لغرض أخلاقي على موقعي
                                 </span>
                             </label>
+                            {!permissionGranted && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 text-right">
+                                    يجب الموافقة على التعهد قبل بدء الفحص
+                                </p>
+                            )}
                         </div>
 
                         <button

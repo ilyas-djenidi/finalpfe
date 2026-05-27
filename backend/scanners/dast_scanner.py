@@ -802,10 +802,48 @@ def run_dast_scan(target: str, config: DASTConfig | None = None) -> dict:
         if err:
             logger.warning("DAST(%s) skipped — %s", tool, err)
 
-    # All three engines unavailable (not installed / not running) — fail loudly
+    # All three engines unavailable (not installed / not running) — return gracefully
     if nikto_error and zap_error and nuclei_error:
-        details = " | ".join(filter(None, [nikto_error, zap_error, nuclei_error]))
-        raise RuntimeError(f"No DAST engines available: {details}")
+        logger.warning("DAST: all engines unavailable — returning informational result")
+        return {
+            "scan_type":       "dast",
+            "target":          target,
+            "vulnerabilities": [
+                {
+                    "title":       "DAST Scan Unavailable",
+                    "severity":    "INFO",
+                    "description": (
+                        "Dynamic scanning tools (Nikto, ZAP, Nuclei) are not installed "
+                        "in this deployment environment. DAST requires these tools to be "
+                        "configured on the server. Please contact your administrator to "
+                        "enable DAST scanning capabilities."
+                    ),
+                    "evidence":    "",
+                    "remediation": (
+                        "Install and configure at least one DAST engine: "
+                        "Nikto (https://cirt.net/Nikto2), "
+                        "OWASP ZAP (https://www.zaproxy.org), or "
+                        "Nuclei (https://nuclei.projectdiscovery.io)."
+                    ),
+                }
+            ],
+            "meta": {
+                "scan_time":     datetime.now(timezone.utc).isoformat(),
+                "profile":       cfg.profile,
+                "tools":         [],
+                "target_url":    target,
+                "issues_found":  0,
+                "nikto_issues":  0,
+                "zap_issues":    0,
+                "nuclei_issues": 0,
+                "errors": {
+                    "nikto":  nikto_error,
+                    "zap":    zap_error,
+                    "nuclei": nuclei_error,
+                },
+                "engines_unavailable": True,
+            },
+        }
 
     vulns = _merge_findings(nikto_vulns, zap_vulns, nuclei_vulns)
 
