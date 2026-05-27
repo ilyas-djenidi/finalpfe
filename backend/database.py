@@ -9,17 +9,28 @@ import bcrypt
 
 logger = logging.getLogger(__name__)
 
-# Allow overriding the DB path via env var so it can point to a Render Persistent Disk.
-# On Render: set DB_PATH=/var/data/cybrain.db  (after mounting a disk at /var/data)
-# Locally: defaults to cybrain.db in the working directory
+# Allow overriding DB location via env var (e.g. Render Persistent Disk).
+# If the requested path is not accessible, fall back to cybrain.db in cwd.
 import os as _os
-DB_PATH = _os.environ.get("DB_PATH", "cybrain.db")
 
-# Auto-create parent directory so the path is always valid
-# (critical when DB_PATH points to a Persistent Disk mount that wasn't set up yet)
-_db_parent = _os.path.dirname(_os.path.abspath(DB_PATH))
-if _db_parent:
-    _os.makedirs(_db_parent, exist_ok=True)
+def _resolve_db_path(requested: str) -> str:
+    parent = _os.path.dirname(_os.path.abspath(requested))
+    if parent:
+        try:
+            _os.makedirs(parent, exist_ok=True)
+            return requested          # parent exists (or was just created) — use it
+        except OSError:
+            pass                      # permission denied / disk not mounted
+    # Fallback: store next to this file (always writable on Render)
+    fallback = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "cybrain.db")
+    logger.warning(
+        "DB path '%s' is not accessible — falling back to '%s'. "
+        "Mount the persistent disk or remove DB_PATH from env vars.",
+        requested, fallback,
+    )
+    return fallback
+
+DB_PATH = _resolve_db_path(_os.environ.get("DB_PATH", "cybrain.db"))
 
 # Sentinel — distinguishes "caller didn't pass locked_target_value" from passing None (clear it)
 _UNSET = object()
