@@ -9,9 +9,14 @@ const BACKEND = import.meta.env.VITE_API_BASE_URL || '';
 const IS_PRODUCTION = !!BACKEND;
 
 async function pingBackend() {
+    // Use native fetch — NOT axios — so the global axios error interceptor
+    // doesn't fire a "Connection error" toast on every failed wake-up probe.
     try {
-        await axios.get(`${BACKEND}/health`, { timeout: 8000, withCredentials: false });
-        return true;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(`${BACKEND}/health`, { signal: ctrl.signal, credentials: 'omit' });
+        clearTimeout(timer);
+        return res.ok;
     } catch {
         return false;
     }
