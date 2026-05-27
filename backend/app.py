@@ -741,6 +741,7 @@ def start_scan():
 @app.route("/api/ai/analyze", methods=["POST"])
 @require_permission("run_scan")
 @limiter.limit("20/minute")
+@csrf.exempt
 def ai_analyze():
     data      = request.get_json(silent=True) or {}
     findings  = data.get("findings", [])
@@ -783,6 +784,7 @@ def ai_analyze():
 @app.route("/api/ai/chat", methods=["POST"])
 @login_required
 @limiter.limit("10/minute")
+@csrf.exempt
 def ai_chat():
     data    = request.get_json(silent=True) or {}
     message = (data.get("message") or "").strip()
