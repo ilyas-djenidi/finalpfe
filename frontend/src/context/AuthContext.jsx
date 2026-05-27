@@ -42,6 +42,12 @@ export const ToastContainer = () => {
 };
 
 // ── Global axios defaults ──────────────────────────────────────────────────────
+// In production (Render/Netlify), VITE_API_BASE_URL points to the Flask backend.
+// In development, Vite's proxy handles /api/* → localhost:5000, so baseURL stays empty.
+const _API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+if (_API_BASE) {
+    axios.defaults.baseURL = _API_BASE;
+}
 axios.defaults.withCredentials = true;
 
 // ── CSRF token management ──────────────────────────────────────────────────────

@@ -78,13 +78,17 @@ if not SECRET_KEY:
         "  SECRET_KEY=your-very-long-random-secret-key"
     )
 
+_IS_PRODUCTION = os.environ.get("FLASK_ENV") == "production"
+
 app.config.update(
     SECRET_KEY=SECRET_KEY,
     WTF_CSRF_ENABLED=True,
     WTF_CSRF_TIME_LIMIT=3600,
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=os.environ.get("FLASK_ENV") == "production",
+    # SameSite=None + Secure is required for cross-origin cookie sending
+    # (frontend on Render/Netlify calling backend on a different domain)
+    SESSION_COOKIE_SAMESITE="None" if _IS_PRODUCTION else "Lax",
+    SESSION_COOKIE_SECURE=_IS_PRODUCTION,
     MAX_CONTENT_LENGTH=10 * 1024 * 1024,   # 10 MB hard limit
     PERMANENT_SESSION_LIFETIME=1800,
 )
@@ -103,11 +107,30 @@ limiter = Limiter(
     storage_uri=os.environ.get("REDIS_URL", "memory://"),
 )
 
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Default origins cover: local Vite dev, local Flask dev, and any HTTPS Render
+# frontend. Add your deployed frontend URL via the ALLOWED_ORIGINS env var:
+#   ALLOWED_ORIGINS=https://securax-frontend.onrender.com,https://your-app.netlify.app
+_DEFAULT_ORIGINS = (
+    "http://localhost:3000,"
+    "http://localhost:5173,"
+    "http://127.0.0.1:3000,"
+    "http://127.0.0.1:5173"
+)
 _ALLOWED_ORIGINS = [
-    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    o.strip()
+    for o in os.environ.get("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
     if o.strip()
 ]
-CORS(app, origins=_ALLOWED_ORIGINS, supports_credentials=True)
+CORS(
+    app,
+    origins=_ALLOWED_ORIGINS,
+    supports_credentials=True,
+    allow_headers=["Content-Type", "X-CSRFToken", "Authorization", "Accept"],
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    expose_headers=["X-CSRFToken"],
+    max_age=600,
+)
 
 # ── CSP nonce ─────────────────────────────────────────────────────────────────
 @app.before_request

@@ -1,0 +1,40 @@
+services:
+  # ── Flask Backend ────────────────────────────────────────────────────────────
+  - type: web
+    name: securax-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --log-level info
+    plan: free
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        # Replace with your actual frontend URL after deploying the static site
+        value: https://securax-frontend.onrender.com
+      - key: GEMINI_API_KEY
+        sync: false   # Set this manually in the Render dashboard
+      - key: CYBRAIN_ADMIN_PASSWORD
+        sync: false   # Set this manually in the Render dashboard
+      - key: CYBRAIN_ANALYST_PASSWORD
+        sync: false   # Set this manually in the Render dashboard
+
+  # ── React Frontend (Static Site) ─────────────────────────────────────────────
+  - type: web
+    name: securax-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://securax-backend-i75y.onrender.com
+    routes:
+      # SPA routing — all paths serve index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
