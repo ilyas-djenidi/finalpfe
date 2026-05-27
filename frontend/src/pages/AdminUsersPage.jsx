@@ -3,8 +3,9 @@ import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     Users, AlertTriangle, ShieldCheck, UserPlus, Trash2,
-    ArrowLeft, Activity, FileText, ToggleLeft, ToggleRight,
-    Search, ChevronLeft, ChevronRight, RefreshCw, KeyRound, Lock, Unlock
+    ArrowLeft, Activity, FileText,
+    Search, ChevronLeft, ChevronRight, RefreshCw, KeyRound, Lock, Unlock,
+    Ban, ShieldOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -335,18 +336,44 @@ const AdminUsersPage = () => {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <button
-                                                        onClick={() => handlePatch(u.id, { is_active: !u.is_active })}
-                                                        disabled={u.username === user.username}
-                                                        className="flex items-center gap-1 text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-default"
-                                                        title={u.is_active ? 'Click to deactivate' : 'Click to activate'}
-                                                    >
+                                                    <div className="flex flex-col gap-1.5">
+                                                        {/* Status badge */}
                                                         {u.is_active ? (
-                                                            <><ToggleRight className="w-5 h-5 text-green-500" /><span className="text-green-600 dark:text-green-400">Active</span></>
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 border border-green-200 dark:border-green-500/20 w-fit">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                                                                Active
+                                                            </span>
                                                         ) : (
-                                                            <><ToggleLeft className="w-5 h-5 text-slate-400" /><span className="text-slate-500">Inactive</span></>
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-red-200 dark:border-red-500/20 w-fit">
+                                                                <Ban className="w-2.5 h-2.5" />
+                                                                Blocked
+                                                            </span>
                                                         )}
-                                                    </button>
+
+                                                        {/* Block / Unblock button */}
+                                                        {u.username !== user.username && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (u.is_active) {
+                                                                        if (window.confirm(`Block "${u.username}"?\nThey will not be able to log in until unblocked.`))
+                                                                            handlePatch(u.id, { is_active: false });
+                                                                    } else {
+                                                                        handlePatch(u.id, { is_active: true });
+                                                                    }
+                                                                }}
+                                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all hover:scale-[1.03] active:scale-[0.97] w-fit ${
+                                                                    u.is_active
+                                                                        ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/20'
+                                                                        : 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20 border border-green-200 dark:border-green-500/20'
+                                                                }`}
+                                                            >
+                                                                {u.is_active
+                                                                    ? <><ShieldOff className="w-2.5 h-2.5" /> Block</>
+                                                                    : <><ShieldCheck className="w-2.5 h-2.5" /> Unblock</>
+                                                                }
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-1">
