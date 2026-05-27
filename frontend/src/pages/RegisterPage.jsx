@@ -4,16 +4,29 @@ import { Lock, User, ArrowRight, ShieldCheck, AlertCircle, Moon, Sun, Eye, EyeOf
 import { useAuth } from '../context/AuthContext';
 
 // ── Password strength ─────────────────────────────────────────────────────────
+// Password must match backend check_password_complexity():
+//   ≥10 chars, uppercase, lowercase, digit, special char
 const getStrength = (pw) => {
-    if (!pw) return { level: 0, label: '', color: '' };
+    if (!pw) return { level: 0, label: '', color: '', hint: '' };
     const hasLower  = /[a-z]/.test(pw);
     const hasUpper  = /[A-Z]/.test(pw);
     const hasDigit  = /\d/.test(pw);
-    const hasSymbol = /[^a-zA-Z0-9]/.test(pw);
+    const hasSymbol = /[!@#$%^&*()\-_=+[\]{};:'",.<>?/\\|`~]/.test(pw);
     const types = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
-    if (pw.length >= 10 && types >= 4) return { level: 3, label: 'Strong',  color: 'bg-green-500'  };
-    if (pw.length >= 8  && types >= 2) return { level: 2, label: 'Medium',  color: 'bg-yellow-400' };
-    return { level: 1, label: 'Weak', color: 'bg-red-500' };
+    if (pw.length >= 10 && types >= 4) return { level: 3, label: 'Strong',  color: 'bg-green-500',  hint: '' };
+    if (pw.length >= 10 && types >= 2) return { level: 2, label: 'Medium',  color: 'bg-yellow-400', hint: 'Add uppercase, digit & symbol' };
+    if (pw.length >= 6)                return { level: 1, label: 'Weak',    color: 'bg-red-500',    hint: 'Min 10 chars with A-Z, 0-9, symbol' };
+    return { level: 1, label: 'Too short', color: 'bg-red-500', hint: 'Minimum 10 characters required' };
+};
+
+const meetsRequirements = (pw) => {
+    return (
+        pw.length >= 10 &&
+        /[A-Z]/.test(pw) &&
+        /[a-z]/.test(pw) &&
+        /\d/.test(pw) &&
+        /[!@#$%^&*()\-_=+[\]{};:'",.<>?/\\|`~]/.test(pw)
+    );
 };
 
 const RegisterPage = () => {
@@ -45,12 +58,13 @@ const RegisterPage = () => {
     const strength    = useMemo(() => getStrength(password), [password]);
     const mismatch    = confirm.length > 0 && confirm !== password;
     const matchOk     = confirm.length > 0 && confirm === password;
+    const pwOk        = meetsRequirements(password);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         if (password !== confirm)  { setError('Passwords do not match.');                   return; }
-        if (password.length < 8)   { setError('Password must be at least 8 characters.');   return; }
+        if (!pwOk) { setError('Password must be ≥10 chars with uppercase, lowercase, digit and symbol.'); return; }
         setLoading(true);
         try {
             const data = await register(username.trim(), password);
@@ -172,7 +186,7 @@ const RegisterPage = () => {
                                         ))}
                                     </div>
                                     <p className={`text-xs mt-1 font-medium ${strengthTextColors[strength.level]}`}>
-                                        {strength.label} password
+                                        {strength.label}{strength.hint ? ` — ${strength.hint}` : ''}
                                     </p>
                                 </div>
                             )}
@@ -215,10 +229,27 @@ const RegisterPage = () => {
                             )}
                         </div>
 
+                        {/* Requirements checklist */}
+                        {password.length > 0 && !pwOk && (
+                            <ul className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5 pl-1">
+                                {[
+                                    [password.length >= 10,          '≥ 10 characters'],
+                                    [/[A-Z]/.test(password),         'Uppercase letter (A-Z)'],
+                                    [/[a-z]/.test(password),         'Lowercase letter (a-z)'],
+                                    [/\d/.test(password),            'A number (0-9)'],
+                                    [/[!@#$%^&*]/.test(password),    'A symbol (!@#$%^&*)'],
+                                ].map(([ok, label]) => (
+                                    <li key={label} className={`flex items-center gap-1.5 ${ok ? 'text-green-500' : 'text-slate-400'}`}>
+                                        <span>{ok ? '✓' : '○'}</span> {label}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+
                         <div className="pt-2">
                             <button
                                 type="submit"
-                                disabled={loading || mismatch}
+                                disabled={loading || mismatch || !pwOk}
                                 className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
                             >
                                 {loading ? (

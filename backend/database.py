@@ -9,7 +9,11 @@ import bcrypt
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = "cybrain.db"
+# Allow overriding the DB path via env var so it can point to a Render Persistent Disk.
+# On Render: set DB_PATH=/var/data/cybrain.db  (after mounting a disk at /var/data)
+# Locally: defaults to cybrain.db in the working directory
+import os as _os
+DB_PATH = _os.environ.get("DB_PATH", "cybrain.db")
 
 # Sentinel — distinguishes "caller didn't pass locked_target_value" from passing None (clear it)
 _UNSET = object()

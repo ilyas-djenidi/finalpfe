@@ -21,6 +21,11 @@ services:
         sync: false   # Set this manually in the Render dashboard
       - key: CYBRAIN_ANALYST_PASSWORD
         sync: false   # Set this manually in the Render dashboard
+      # ── Persistent disk (optional but recommended) ──────────────────────────
+      # If you mount a Render Disk at /var/data, set this so the DB survives redeploys.
+      # Without this, cybrain.db resets on every deploy (all user accounts wiped).
+      - key: DB_PATH
+        value: /var/data/cybrain.db   # remove this line if not using a persistent disk
 
   # ── React Frontend (Static Site) ─────────────────────────────────────────────
   - type: web
