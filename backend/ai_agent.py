@@ -35,10 +35,14 @@ _genai_client = None
 try:
     if _GEMINI_KEY:
         from google import genai as _genai_mod
-        _genai_client = _genai_mod.Client(api_key=_GEMINI_KEY)
-        logger.info("ARIA: Gemini 2.0 Flash client initialised")
+        # http_options sets the HTTP-level request timeout (30 s per call)
+        _genai_client = _genai_mod.Client(
+            api_key=_GEMINI_KEY,
+            http_options={"timeout": 30},
+        )
+        logger.info("ARIA: Gemini 2.0 Flash client initialised ✓")
 except Exception as _e:
-    logger.warning("ARIA: Gemini init failed (%s)", _e)
+    logger.warning("ARIA: Gemini init failed — %s. Set GEMINI_API_KEY env var.", _e)
 
 # ── ARIA system prompt ────────────────────────────────────────────────────────
 _SYSTEM_PROMPT = """\
@@ -389,7 +393,6 @@ class ARIA:
             resp = _genai_client.models.generate_content(
                 model="gemini-2.0-flash",
                 contents=full,
-                config={"timeout": 30},
             )
             return resp.text
         except Exception as exc:

@@ -170,20 +170,30 @@ def init_db():
 
 
 def _bootstrap_admin():
-    """Create default admin + analyst if the users table is empty."""
-    import os
-    count = _get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if count > 0:
-        return
+    """Ensure the default admin and analyst accounts always exist.
 
+    Runs on every startup — safe to call repeatedly.  Skips any account
+    that already exists so existing users / passwords are never overwritten.
+    This means the accounts always survive a Render restart (fresh ephemeral DB)
+    and won't clobber manually-added users.
+    """
+    import os
     admin_pw   = os.environ.get("CYBRAIN_ADMIN_PASSWORD",   "").strip() or "Admin@2024!"
     analyst_pw = os.environ.get("CYBRAIN_ANALYST_PASSWORD", "").strip() or "Analyst@2024!"
 
-    now = datetime.now(timezone.utc).isoformat()
+    now     = datetime.now(timezone.utc).isoformat()
+    created = []
     for username, password, role in [
         ("admin",   admin_pw,   "admin"),
         ("analyst", analyst_pw, "analyst"),
     ]:
+        # Skip if account already exists (never overwrite)
+        exists = _get_db().execute(
+            "SELECT 1 FROM users WHERE username=?", (username,)
+        ).fetchone()
+        if exists:
+            continue
+
         perms = (
             json.dumps(["run_scan", "view_reports", "delete_reports", "manage_users", "view_audit"])
             if role == "admin"
@@ -196,13 +206,16 @@ def _bootstrap_admin():
                 " VALUES (?,?,?,?,1,?,?)",
                 (username, pw_hash, role, perms, now, "bootstrap"),
             )
+            created.append(username)
         except sqlite3.IntegrityError:
-            pass
-    _get_db().commit()
-    logger.warning(
-        "bootstrapped default accounts — change passwords immediately | admin=%s | analyst=%s",
-        admin_pw, analyst_pw,
-    )
+            pass  # race condition — another worker beat us to it
+
+    if created:
+        _get_db().commit()
+        logger.warning(
+            "bootstrapped missing accounts: %s — change default passwords immediately!",
+            ", ".join(created),
+        )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
