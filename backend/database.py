@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 import os as _os
 DB_PATH = _os.environ.get("DB_PATH", "cybrain.db")
 
+# Auto-create parent directory so the path is always valid
+# (critical when DB_PATH points to a Persistent Disk mount that wasn't set up yet)
+_db_parent = _os.path.dirname(_os.path.abspath(DB_PATH))
+if _db_parent:
+    _os.makedirs(_db_parent, exist_ok=True)
+
 # Sentinel — distinguishes "caller didn't pass locked_target_value" from passing None (clear it)
 _UNSET = object()
 
