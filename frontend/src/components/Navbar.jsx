@@ -2,21 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     Moon, Sun, User, LogOut, Menu, X,
-    ChevronDown, Network, Globe, Code, Server, Package,
-    Shield, Wifi, FileSearch, Layers, Zap
+    ChevronDown, Network, Globe, Server, Package,
+    Shield, FileSearch, Layers, Zap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import securaxLogo from '../assets/securax_logo.png';
 
 const NAV_GROUPS = [
-    {
-        label: 'Scan Network',
-        icon: Network,
-        items: [
-            { label: 'Internal Network Scan', desc: 'Discover internal hosts and services', to: '/scan/network', icon: Wifi },
-            { label: 'External Network Scan', desc: 'Map external attack surface', to: '/scan/network-ext', icon: Network },
-        ],
-    },
     {
         label: 'Scan Web',
         icon: Globe,
@@ -161,6 +153,19 @@ const Navbar = () => {
 
                     {/* Center: nav items */}
                     <div className="hidden lg:flex items-center gap-2">
+                        {/* Scan Network — direct link, no dropdown */}
+                        <Link
+                            to="/scan/network"
+                            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                pathname.startsWith('/scan/network')
+                                    ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50'
+                            }`}
+                        >
+                            <Network className="w-3.5 h-3.5" />
+                            Scan Network
+                        </Link>
+
                         {NAV_GROUPS.map(group => (
                             <DropdownMenu key={group.label} group={group} pathname={pathname} />
                         ))}
@@ -213,9 +218,9 @@ const Navbar = () => {
             {/* Mobile Menu */}
             {mobileMenuOpen && (
                 <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 pt-2 pb-4 space-y-1">
-                    <p className="px-3 pt-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scan Network</p>
-                    <Link to="/scan/network" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">Internal Network Scan</Link>
-                    <Link to="/scan/network-ext" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">External Network Scan</Link>
+                    <Link to="/scan/network" onClick={() => setMobileMenuOpen(false)} className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${pathname.startsWith('/scan/network') ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                        <Network className="w-4 h-4" /> Scan Network
+                    </Link>
 
                     <p className="px-3 pt-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Scan Web</p>
                     <Link to="/scan/web" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 pl-5">Web Application Scan</Link>
