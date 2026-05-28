@@ -70,6 +70,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             username         TEXT    UNIQUE NOT NULL,
+            email            TEXT,
             password_hash    TEXT    NOT NULL,
             role             TEXT    NOT NULL DEFAULT 'analyst',
             permissions      TEXT    NOT NULL DEFAULT '[]',
@@ -81,7 +82,8 @@ def init_db():
             last_login       TEXT,
             login_count      INTEGER NOT NULL DEFAULT 0,
             created_at       TEXT    NOT NULL,
-            created_by       TEXT
+            created_by       TEXT,
+            locked_target    TEXT
         );
 
         CREATE TABLE IF NOT EXISTS scan_reports (
@@ -158,12 +160,21 @@ def init_db():
         "ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN locked_until TEXT",
         "ALTER TABLE users ADD COLUMN locked_target TEXT",
+        "ALTER TABLE users ADD COLUMN created_by TEXT",
+        "ALTER TABLE users ADD COLUMN email TEXT",
     ]:
         try:
             db.execute(migration)
             db.commit()
         except sqlite3.OperationalError:
             pass  # column already exists
+
+    # TOTP is disabled in this deployment — clear it for any existing accounts
+    try:
+        db.execute("UPDATE users SET totp_enabled=0, totp_secret=NULL WHERE totp_enabled=1")
+        db.commit()
+    except Exception:
+        pass
 
     _bootstrap_admin()
     logger.info("database ready | path=%s", DB_PATH)
@@ -278,7 +289,8 @@ def count_users() -> int:
 
 def create_user(username: str, password: str, role: str = "analyst",
                 permissions=None, created_by: str | None = None,
-                allowed_target: str | None = None) -> tuple[bool, str]:
+                allowed_target: str | None = None,
+                email: str | None = None) -> tuple[bool, str]:
     if permissions is None:
         permissions = (
             ["run_scan", "view_reports", "delete_reports", "manage_users", "view_audit"]
@@ -289,18 +301,33 @@ def create_user(username: str, password: str, role: str = "analyst",
     now = datetime.now(timezone.utc).isoformat()
     # allowed_target → stored in locked_target column
     target_val = allowed_target.strip().lower() if allowed_target and allowed_target.strip() else None
+    email_val  = email.strip().lower() if email and email.strip() else None
     try:
         _exec(
-            "INSERT INTO users (username,password_hash,role,permissions,is_active,created_at,created_by,locked_target)"
-            " VALUES (?,?,?,?,1,?,?,?)",
-            (username, pw_hash, role, json.dumps(permissions), now, created_by, target_val),
+            "INSERT INTO users (username,email,password_hash,role,permissions,is_active,created_at,created_by,locked_target)"
+            " VALUES (?,?,?,?,?,1,?,?,?)",
+            (username, email_val, pw_hash, role, json.dumps(permissions), now, created_by, target_val),
         )
         return True, "User created successfully."
     except sqlite3.IntegrityError:
         return False, "Username already exists."
+    except sqlite3.OperationalError:
+        # email column may not exist yet (schema migration pending) — retry without it
+        try:
+            _exec(
+                "INSERT INTO users (username,password_hash,role,permissions,is_active,created_at,created_by,locked_target)"
+                " VALUES (?,?,?,?,1,?,?,?)",
+                (username, pw_hash, role, json.dumps(permissions), now, created_by, target_val),
+            )
+            return True, "User created successfully."
+        except sqlite3.IntegrityError:
+            return False, "Username already exists."
+        except Exception as exc2:
+            logger.error("create_user fallback: %s", exc2)
+            return False, f"Database error: {exc2}"
     except Exception as exc:
         logger.error("create_user: %s", exc)
-        return False, "Database error."
+        return False, f"Database error: {exc}"
 
 
 def update_user(uid: int, role=None, permissions=None, is_active=None,

@@ -21,6 +21,15 @@ from typing import Optional
 
 import requests
 
+# Load .env FIRST so GEMINI_API_KEY is in os.environ before we read it.
+# This is required because ai_agent is imported before load_dotenv() is called
+# in app.py (module-level code runs at import time, not at call time).
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv()
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 # ── Environment ───────────────────────────────────────────────────────────────
@@ -32,17 +41,17 @@ _NVD_BASE     = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
 # ── Gemini init ───────────────────────────────────────────────────────────────
 _genai_client = None
+_GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"]
+
 try:
     if _GEMINI_KEY:
         from google import genai as _genai_mod
-        # http_options sets the HTTP-level request timeout (30 s per call)
-        _genai_client = _genai_mod.Client(
-            api_key=_GEMINI_KEY,
-            http_options={"timeout": 30},
-        )
-        logger.info("ARIA: Gemini 2.0 Flash client initialised ✓")
+        _genai_client = _genai_mod.Client(api_key=_GEMINI_KEY)
+        logger.info("ARIA: Gemini client initialised ✓ (key=...%s)", _GEMINI_KEY[-6:])
+    else:
+        logger.warning("ARIA: GEMINI_API_KEY not set — running in offline mode.")
 except Exception as _e:
-    logger.warning("ARIA: Gemini init failed — %s. Set GEMINI_API_KEY env var.", _e)
+    logger.warning("ARIA: Gemini init failed — %s", _e)
 
 # ── ARIA system prompt ────────────────────────────────────────────────────────
 _SYSTEM_PROMPT = """\
@@ -388,16 +397,20 @@ class ARIA:
     def _gemini(self, prompt: str, system: str = "") -> Optional[str]:
         if not _genai_client:
             return None
-        try:
-            full = f"{system}\n\n{prompt}" if system else prompt
-            resp = _genai_client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=full,
-            )
-            return resp.text
-        except Exception as exc:
-            logger.warning("ARIA Gemini error: %s", exc)
-            return None
+        full = f"{system}\n\n{prompt}" if system else prompt
+        for model in _GEMINI_MODELS:
+            try:
+                resp = _genai_client.models.generate_content(
+                    model=model,
+                    contents=full,
+                )
+                text = getattr(resp, "text", None)
+                if text and text.strip():
+                    return text.strip()
+            except Exception as exc:
+                logger.warning("ARIA Gemini (%s) error: %s", model, exc)
+                continue
+        return None
 
     def _ollama(self, prompt: str, system: str = "") -> Optional[str]:
         if not _OLLAMA_URL:

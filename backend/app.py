@@ -96,6 +96,17 @@ app.config.update(
 # ── Extensions ────────────────────────────────────────────────────────────────
 csrf = CSRFProtect(app)
 
+# ── Pre-CSRF hook: exempt ALL /api/* routes ───────────────────────────────────
+# Flask-WTF's CSRF before_request hook runs BEFORE the view-function decorators
+# can signal exemption through __qualname__ matching.  We insert our hook at
+# index 0 so it executes first and adds the raw endpoint name to the exempt set,
+# guaranteeing the CSRF hook skips validation for every JSON API call.
+def _auto_exempt_api_from_csrf():
+    if request.path.startswith("/api/") and request.endpoint:
+        csrf._exempt_views.add(request.endpoint)           # raw name  e.g. "ai_chat"
+
+app.before_request_funcs.setdefault(None, []).insert(0, _auto_exempt_api_from_csrf)
+
 login_manager = LoginManager(app)
 login_manager.login_view    = "login"
 login_manager.login_message = "يرجى تسجيل الدخول للمتابعة."
@@ -113,8 +124,10 @@ limiter = Limiter(
 #   ALLOWED_ORIGINS=https://securax-frontend.onrender.com,https://your-app.netlify.app
 _DEFAULT_ORIGINS = (
     "http://localhost:3000,"
+    "http://localhost:3001,"
     "http://localhost:5173,"
     "http://127.0.0.1:3000,"
+    "http://127.0.0.1:3001,"
     "http://127.0.0.1:5173"
 )
 _ALLOWED_ORIGINS = [
@@ -148,12 +161,18 @@ def set_security_headers(response):
     response.headers["Referrer-Policy"]           = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"]        = "geolocation=(), microphone=(), camera=()"
     nonce = getattr(g, "csp_nonce", "")
+    # In production, the React frontend (Netlify) calls this backend from a
+    # different origin, so connect-src must include the frontend domain.
+    _frontend_origins = " ".join(
+        o for o in _ALLOWED_ORIGINS if o.startswith("https://")
+    ) or "'self'"
+    _connect_src = f"'self' {_frontend_origins}" if _IS_PRODUCTION else "'self'"
     response.headers["Content-Security-Policy"] = (
         f"default-src 'self'; "
         f"script-src 'self' 'nonce-{nonce}'; "
         f"style-src 'self' 'nonce-{nonce}'; "
         f"img-src 'self' data: https:; "
-        f"connect-src 'self'; "
+        f"connect-src {_connect_src}; "
         f"font-src 'self' data:; "
         f"frame-ancestors 'self';"
     )
@@ -794,7 +813,7 @@ def ai_analyze():
 
 @app.route("/api/ai/chat", methods=["POST"])
 @login_required
-@limiter.limit("10/minute")
+@limiter.limit("30/minute")
 @csrf.exempt
 def ai_chat():
     data    = request.get_json(silent=True) or {}
@@ -802,13 +821,25 @@ def ai_chat():
     context = data.get("context", {})
 
     if not message:
-        return jsonify({"error": "الرسالة فارغة."}), 400
-    if len(message) > 2000:
-        return jsonify({"error": "الرسالة طويلة جداً (الحد 2000 حرف)."}), 400
+        return jsonify({"error": "Empty message."}), 400
+    if len(message) > 4000:
+        return jsonify({"error": "Message too long (max 4000 chars)."}), 400
 
-    aria  = get_aria()
-    reply = aria.chat(message, context, user_id=str(current_user.id))
-    return jsonify({"reply": reply, "ai_mode": "online" if aria.ai_active else "offline"})
+    try:
+        aria  = get_aria()
+        reply = aria.chat(message, context, user_id=str(current_user.id))
+        return jsonify({
+            "reply":    reply,
+            "provider": aria.provider,       # "gemini" | "ollama" | "offline"
+            "ai_mode":  "online" if aria.ai_active else "offline",
+        })
+    except Exception as exc:
+        logger.exception("ai_chat error")
+        return jsonify({
+            "reply":    f"⚠️ AI error: {exc}",
+            "provider": "offline",
+            "ai_mode":  "offline",
+        }), 200
 
 
 @app.route("/api/ai/fix", methods=["POST"])
@@ -1043,10 +1074,7 @@ def api_login():
             resp["lock_seconds_remaining"] = lock_secs
         return jsonify(resp), 401
 
-    if user.totp_enabled:
-        session["pending_totp_user_id"] = user.id
-        return jsonify({"ok": False, "totp_required": True}), 200
-
+    # TOTP disabled for this deployment — log in directly regardless of totp_enabled flag
     login_user(user, remember=False)
     update_last_login(user.id)
     log_event("login_success", username, user.id, category="auth",
@@ -1209,6 +1237,7 @@ def api_register():
     """
     data     = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
+    email    = (data.get("email")    or "").strip()
     password = data.get("password", "")
 
     if not username or not password:
@@ -1223,13 +1252,15 @@ def api_register():
     if not ok:
         return jsonify({"ok": False, "error": msg}), 400
 
-    ok, msg = create_user(username, password, role="analyst", created_by="self-registration")
+    ok, msg = create_user(username, password, role="analyst",
+                          created_by="self-registration", email=email or None)
     if not ok:
-        return jsonify({"ok": False, "error": msg}), 409
+        status = 409 if "already exists" in msg else 500
+        return jsonify({"ok": False, "error": msg}), status
 
     log_event("user_registered", username, category="auth",
               ip_address=request.remote_addr, status="success")
-    logger.info("self-registration | user=%s | ip=%s", username, request.remote_addr)
+    logger.info("self-registration | user=%s | email=%s | ip=%s", username, email or "—", request.remote_addr)
     return jsonify({"ok": True, "message": "Account created. You can now log in."}), 201
 
 
@@ -2000,6 +2031,25 @@ def scan_dast_bridge():
         return err
     try:
         result = run_dast_scan(target)
+    except ValueError as exc:
+        # SSRF guard blocked the target (private / reserved address)
+        return jsonify({"error": f"Target blocked by security policy: {exc}"}), 400
+    except (RuntimeError, OSError) as exc:
+        # DNS failure, tool not found, or other setup error — return graceful result
+        result = {
+            "scan_type": "dast", "target": target,
+            "vulnerabilities": [{
+                "title": "DAST Scan Unavailable",
+                "severity": "INFO",
+                "description": f"DAST scan could not start: {exc}",
+                "evidence": "", "remediation": "Check that the target URL is reachable.",
+            }],
+            "meta": {"scan_time": "", "profile": "standard", "tools": [], "target_url": target, "issues_found": 0},
+        }
+    except Exception as exc:
+        logger.exception("scan_dast_bridge error")
+        return jsonify({"error": str(exc)}), 500
+    try:
         vulns  = result.get("vulnerabilities", [])
         findings = []
         for v in vulns:
@@ -2027,7 +2077,7 @@ def scan_dast_bridge():
             "report_token": report_token,
         })
     except Exception as exc:
-        logger.exception("scan_dast_bridge error")
+        logger.exception("scan_dast_bridge post-scan error")
         return jsonify({"error": str(exc)}), 500
 
 

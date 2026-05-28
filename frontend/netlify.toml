@@ -7,7 +7,9 @@
   publish = "dist"
   command = "npm run build"
 
-# Optional: Add environment variables here if you want to hardcode them, 
-# although Netlify UI is better for sensitive keys.
 [build.environment]
   NODE_VERSION = "20"
+  # VITE_API_BASE_URL is set in .env.production (committed) and can be
+  # overridden via Netlify UI → Site Settings → Environment Variables.
+  # Set it to your Render backend URL, e.g.:
+  #   VITE_API_BASE_URL = https://securax-backend-i75y.onrender.com

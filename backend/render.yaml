@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: securax-backend
+    runtime: python
+    region: frankfurt       # closest to your users — change to oregon/ohio if needed
+    plan: free
+
+    # Build
+    buildCommand: pip install -r requirements.txt
+
+    # Start — gunicorn with our config
+    startCommand: gunicorn -c gunicorn.conf.py app:app
+
+    # Health check — Render pings this to decide if the deploy succeeded
+    healthCheckPath: /health
+
+    # Environment variables (set SECRET values in Render Dashboard → Environment)
+    envVars:
+      - key: FLASK_ENV
+        value: production
+
+      - key: FLASK_DEBUG
+        value: "0"
+
+      - key: REDIS_URL
+        value: memory://
+
+      # ── Set these in Render Dashboard (not here — don't commit secrets) ──────
+      # SECRET_KEY          → long random string (openssl rand -hex 32)
+      # GEMINI_API_KEY      → from https://aistudio.google.com/app/apikey
+      # ALLOWED_ORIGINS     → https://your-netlify-app.netlify.app
+      # CYBRAIN_ADMIN_PASSWORD   → strong password for bootstrap admin account
+      # CYBRAIN_ANALYST_PASSWORD → strong password for bootstrap analyst account
+      # DB_PATH             → /data/cybrain.db  (if using Render Persistent Disk)
+
+      # ── ZAP (optional, not available on free Render) ──────────────────────────
+      - key: ZAP_ENABLED
+        value: "0"
+
+      # ── DAST internal scanning allowed (set to 0 in production) ───────────────
+      - key: DAST_ALLOW_INTERNAL
+        value: "0"

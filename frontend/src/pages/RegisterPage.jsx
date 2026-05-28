@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, User, ArrowRight, ShieldCheck, AlertCircle, Moon, Sun, Eye, EyeOff } from 'lucide-react';
+import { Lock, User, Mail, ArrowRight, AlertCircle, Moon, Sun, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import securaxLogo from '../assets/securax_logo.png';
 
@@ -35,6 +35,7 @@ const RegisterPage = () => {
     const navigate     = useNavigate();
 
     const [username,     setUsername]     = useState('');
+    const [email,        setEmail]        = useState('');
     const [password,     setPassword]     = useState('');
     const [confirm,      setConfirm]      = useState('');
     const [showPass,     setShowPass]     = useState(false);
@@ -68,7 +69,7 @@ const RegisterPage = () => {
         if (!pwOk) { setError('Password must be ≥10 chars with uppercase, lowercase, digit and symbol.'); return; }
         setLoading(true);
         try {
-            const data = await register(username.trim(), password);
+            const data = await register(username.trim(), email.trim(), password);
             if (data.ok) {
                 navigate('/login', { state: { registered: true } });
             } else {
@@ -139,6 +140,25 @@ const RegisterPage = () => {
                                     maxLength={32}
                                     pattern="[a-zA-Z0-9_\-]+"
                                     placeholder="e.g. analyst01"
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-shadow"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Email */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                Email <span className="text-slate-400 font-normal">(optional)</span>
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Mail className="h-5 w-5 text-slate-400" />
+                                </div>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={e => setEmail(e.target.value)}
+                                    placeholder="you@example.com"
                                     className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-shadow"
                                 />
                             </div>
