@@ -69,9 +69,7 @@ const FEATURES = [
 
 const STATS = [
     { value: '6+', label: 'Scan Types' },
-    { value: '100%', label: 'Authorized Use' },
     { value: 'ARIA', label: 'AI Security Advisor' },
-    { value: 'Free', label: 'Open Platform' },
 ];
 
 function FloatingOrb({ style, className }) {
@@ -129,11 +127,7 @@ const LandingPage = () => {
                 <FloatingOrb className="w-[300px] h-[300px] bg-purple-600/8" style={{ bottom: '0', left: '30%' }} />
 
                 <div className="relative z-10 max-w-4xl mx-auto text-center">
-                    {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 mb-8 backdrop-blur-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                        Authorized Security Testing Platform
-                    </div>
+                    {/* Badge removed as requested */}
 
                     <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
                         <span className="text-white">Secure Your</span>
@@ -166,7 +160,7 @@ const LandingPage = () => {
                     </div>
 
                     {/* Stats row */}
-                    <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
+                    <div className="mt-16 grid grid-cols-2 gap-4 max-w-md mx-auto">
                         {STATS.map((s, i) => (
                             <div key={i} className="bg-white/[0.03] border border-white/8 rounded-2xl py-4 px-3 backdrop-blur-sm">
                                 <div className="text-2xl font-bold text-white mb-1">{s.value}</div>
