@@ -463,14 +463,29 @@ def run_nmap_scan(target: str, deep: bool = False, internal: bool = False) -> di
         logger.warning("python-nmap not installed — returning graceful result")
         return _nmap_unavailable_result(target, internal, "python-nmap package not installed.")
 
-    if not shutil.which("nmap"):
+    # shutil.which only checks PATH — on Windows nmap installs outside PATH by default.
+    # Build an extended search path that includes common Windows install directories.
+    _NMAP_EXTRA_DIRS = [
+        r"C:\Program Files (x86)\Nmap",
+        r"C:\Program Files\Nmap",
+        "/usr/bin",
+        "/usr/local/bin",
+        "/opt/homebrew/bin",
+    ]
+    _nmap_search = tuple(
+        d for d in _NMAP_EXTRA_DIRS + os.environ.get("PATH", "").split(os.pathsep)
+        if d
+    )
+    _nmap_bin = shutil.which("nmap", path=os.pathsep.join(_nmap_search))
+    if not _nmap_bin:
         logger.warning("nmap binary not in PATH — returning graceful result")
         return _nmap_unavailable_result(
             target, internal,
             "nmap binary not found. Install via: apt install nmap / brew install nmap / choco install nmap"
         )
 
-    nm = nmap.PortScanner()
+    # Pass the resolved binary path directly so python-nmap doesn't re-search PATH
+    nm = nmap.PortScanner(nmap_search_path=(_nmap_bin,))
 
     # ── Step 1: start crt.sh in a background thread NOW ──────────────────────
     # crt.sh can take 10-20 seconds — overlap it with the Nmap scan.
